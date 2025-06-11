@@ -45,10 +45,12 @@ let lives = 5;
 let armor = 5;
 let score = 0;
 const palette = ['#fff','#0ff','#f0f','#ff0','#0f0','#f00','#00f','#f80'];
+const BULLET_LIFE = 3; // seconds bullets stay alive
 
 function updateTopbar(){
   scoreEl.textContent = 'Score: ' + String(Math.floor(score)).padStart(5,'0');
-  statusEl.innerHTML = 'Lives: ' + String(lives).padStart(2,'0') + '&nbsp;&nbsp;Armor: ' + '|'.repeat(armor);
+  const armorStr = ('|'.repeat(armor)).padEnd(5, '.');
+  statusEl.innerHTML = 'Lives: ' + String(lives).padStart(2,'0') + '&nbsp;&nbsp;Armor: ' + armorStr;
 }
 
 function addScore(hp){
@@ -233,14 +235,14 @@ function update(dt){
       ship.thrust.x *= 0.99;
       ship.thrust.y *= 0.99;
     }
-    ship.x += ship.thrust.x;
-    ship.y += ship.thrust.y;
-    if(ship.x<0) ship.x += canvas.width;
-    if(ship.x>canvas.width) ship.x -= canvas.width;
-    if(ship.y<0) ship.y += canvas.height;
-    if(ship.y>canvas.height) ship.y -= canvas.height;
+    ship.x = (ship.x + ship.thrust.x + canvas.width) % canvas.width;
+    ship.y = (ship.y + ship.thrust.y + canvas.height) % canvas.height;
     if(keys[KEY_SPACE] && ship.canShoot){
-      bullets.push({x:ship.x+Math.cos(ship.angle)*ship.radius,y:ship.y+Math.sin(ship.angle)*ship.radius,dx:Math.cos(ship.angle)*5+ship.thrust.x,dy:Math.sin(ship.angle)*5+ship.thrust.y,life:2});
+      bullets.push({x:ship.x+Math.cos(ship.angle)*ship.radius,
+                    y:ship.y+Math.sin(ship.angle)*ship.radius,
+                    dx:Math.cos(ship.angle)*5+ship.thrust.x,
+                    dy:Math.sin(ship.angle)*5+ship.thrust.y,
+                    life:BULLET_LIFE});
       ship.canShoot=false;
     }
     if(!keys[KEY_SPACE]) ship.canShoot=true;
@@ -250,26 +252,21 @@ function update(dt){
   flashTimer = Math.max(0, flashTimer - dt);
 
   bullets.forEach((b,bi)=>{
-    b.x+=b.dx; b.y+=b.dy; b.life-=dt;
-    if(b.x<0) b.x+=canvas.width;
-    if(b.x>canvas.width) b.x-=canvas.width;
-    if(b.y<0) b.y+=canvas.height;
-    if(b.y>canvas.height) b.y-=canvas.height;
+    b.x = (b.x + b.dx + canvas.width) % canvas.width;
+    b.y = (b.y + b.dy + canvas.height) % canvas.height;
+    b.life -= dt;
     if(!ship.dead && spawnInvul<=0 && Math.hypot(b.x-ship.x,b.y-ship.y)<ship.radius){
       bullets.splice(bi,1);
       spawnParticles(b.x,b.y,5,'#f00');
-      armor-=1; flashTimer=2; updateTopbar();
+      armor-=1; flashTimer=1; updateTopbar();
       if(armor<=0) explodeShip();
     }
   });
   bullets = bullets.filter(b=>b.life>0);
 
   asteroids.forEach(a=>{
-    a.x+=a.dx; a.y+=a.dy;
-    if(a.x < -a.radius) a.x += canvas.width + a.radius*2;
-    if(a.x > canvas.width + a.radius) a.x -= canvas.width + a.radius*2;
-    if(a.y < -a.radius) a.y += canvas.height + a.radius*2;
-    if(a.y > canvas.height + a.radius) a.y -= canvas.height + a.radius*2;
+    a.x = (a.x + a.dx + canvas.width) % canvas.width;
+    a.y = (a.y + a.dy + canvas.height) % canvas.height;
   });
 
   bullets.forEach((b,bi)=>{
@@ -332,7 +329,7 @@ function update(dt){
       a.dx += Math.cos(ang)*force*5/a.mass;
       a.dy += Math.sin(ang)*force*5/a.mass;
       if(spawnInvul<=0){
-        armor-=1; flashTimer=2; updateTopbar();
+        armor-=1; flashTimer=1; updateTopbar();
         spawnParticles(ship.x+Math.cos(ang)*ship.radius, ship.y+Math.sin(ang)*ship.radius,10,'#f00');
         a.hp -=1;
         if(armor<=0) explodeShip();
@@ -367,6 +364,8 @@ function drawWrapped(x,y,r,fn){
 
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 
   asteroidLines.forEach(l=>{
     ctx.save();
@@ -383,16 +382,20 @@ function draw(){
     ctx.restore();
   });
 
-  ctx.strokeStyle = flashTimer>0 ? '#f00' : '#fff';
+  ctx.strokeStyle = '#fff';
   if(!ship.dead){
     if(spawnInvul<=0 || Math.floor(spawnInvul*10)%2===0){
       drawWrapped(ship.x, ship.y, ship.radius, ()=>{
+        ctx.save();
+        ctx.translate(ship.x, ship.y);
+        ctx.rotate(ship.angle);
         ctx.beginPath();
-        ctx.moveTo(ship.x + ship.radius, ship.y);
-        ctx.lineTo(ship.x - ship.radius, ship.y + ship.radius/2);
-        ctx.lineTo(ship.x - ship.radius, ship.y - ship.radius/2);
+        ctx.moveTo(ship.radius, 0);
+        ctx.lineTo(-ship.radius, ship.radius/2);
+        ctx.lineTo(-ship.radius, -ship.radius/2);
         ctx.closePath();
         ctx.stroke();
+        ctx.restore();
       });
     }
   } else {
@@ -410,8 +413,13 @@ function draw(){
     });
   }
 
-  ctx.fillStyle='white';
-  bullets.forEach(b=>drawWrapped(b.x,b.y,2,()=>ctx.fillRect(b.x-2,b.y-2,4,4)));
+  bullets.forEach(b=>{
+    ctx.save();
+    ctx.fillStyle='white';
+    ctx.globalAlpha = Math.max(0, b.life / BULLET_LIFE);
+    drawWrapped(b.x,b.y,2,()=>ctx.fillRect(b.x-2,b.y-2,4,4));
+    ctx.restore();
+  });
 
   asteroids.forEach(a=>{
     ctx.strokeStyle=a.color;
@@ -431,6 +439,14 @@ function draw(){
     ctx.fillText('Game Over', canvas.width/2, canvas.height/2);
     ctx.font = '24px sans-serif';
     ctx.fillText('Restarting in ' + Math.ceil(restartTimer), canvas.width/2, canvas.height/2 + 40);
+  }
+
+  if(flashTimer>0 && Math.floor(flashTimer*20)%2===0){
+    ctx.save();
+    ctx.globalCompositeOperation = 'difference';
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.restore();
   }
 }
 
