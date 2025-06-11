@@ -20,24 +20,33 @@ let bullets = [];
 let asteroids = [];
 let lastTime = 0;
 
+function spawnInitialAsteroids(num) {
+  for (let i = 0; i < num; i++) {
+    spawnAsteroid();
+  }
+}
+
 // Input handling
 window.addEventListener('keydown', e => { keys[e.keyCode] = true; });
 window.addEventListener('keyup', e => { keys[e.keyCode] = false; });
 
-function spawnAsteroid(){
-  const edge = Math.floor(Math.random()*4);
-  let x, y, dx, dy;
-  const speed = Math.random()*1.5+0.5;
-  const angle = Math.random()*Math.PI*2;
-  dx = Math.cos(angle)*speed;
-  dy = Math.sin(angle)*speed;
-  switch(edge){
-    case 0: x=0; y=Math.random()*canvas.height; break;
-    case 1: x=canvas.width; y=Math.random()*canvas.height; break;
-    case 2: x=Math.random()*canvas.width; y=0; break;
-    default: x=Math.random()*canvas.width; y=canvas.height; break;
+function spawnAsteroid() {
+  if (asteroids.length >= 10) return;
+  const x = Math.random() * canvas.width;
+  const y = Math.random() * canvas.height;
+  const angle = Math.random() * Math.PI * 2;
+  const speed = Math.random() * 0.5 + 0.2;
+  const dx = Math.cos(angle) * speed;
+  const dy = Math.sin(angle) * speed;
+  const radius = Math.random() * 30 + 20;
+  const points = [];
+  const count = Math.floor(Math.random() * 5) + 5;
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2;
+    const r = radius * (0.7 + Math.random() * 0.3);
+    points.push({ x: Math.cos(a) * r, y: Math.sin(a) * r });
   }
-  asteroids.push({x,y,dx,dy,radius:40});
+  asteroids.push({ x, y, dx, dy, radius, points });
 }
 
 function update(dt){
@@ -108,7 +117,6 @@ function update(dt){
     }
   }
 
-  if(Math.random()<0.01) spawnAsteroid();
 }
 
 function draw(){
@@ -134,7 +142,11 @@ function draw(){
   // Draw asteroids
   asteroids.forEach(a => {
     ctx.beginPath();
-    ctx.arc(a.x,a.y,a.radius,0,Math.PI*2);
+    ctx.moveTo(a.x + a.points[0].x, a.y + a.points[0].y);
+    for (let i = 1; i < a.points.length; i++) {
+      ctx.lineTo(a.x + a.points[i].x, a.y + a.points[i].y);
+    }
+    ctx.closePath();
     ctx.stroke();
   });
 }
@@ -146,4 +158,6 @@ function loop(timestamp){
   draw();
   requestAnimationFrame(loop);
 }
+
+spawnInitialAsteroids(5);
 requestAnimationFrame(loop);

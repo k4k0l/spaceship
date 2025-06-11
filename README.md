@@ -7,3 +7,5 @@ Controls:
 - **Space bar**: Shoot
 
 Avoid the asteroids and try to survive as long as possible!
+
+Asteroids appear immediately when the game starts. Each one is an irregular polygon moving in a random direction.
