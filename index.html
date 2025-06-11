@@ -5,13 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simple Asteroids Game</title>
   <style>
-    body { margin: 0; background: #000; color: #fff; font-family: sans-serif; text-align: center; }
+    @import url('https://fonts.googleapis.com/css2?family=Doto:wght@100..900&display=swap');
+    body { margin: 0; background: #000; color: #fff; font-family: 'Doto', sans-serif; text-align: center; }
     canvas { background: #000; display: block; margin: auto; }
+    #container { margin: auto; width: fit-content; }
+    #topbar { display: flex; justify-content: space-between; color: #fff; font-size: 24px; }
+    .flash { color: red; }
   </style>
 </head>
 <body>
-  <h1>Asteroids</h1>
-  <canvas id="game" width="800" height="600"></canvas>
+  <div id="container">
+    <div id="topbar">
+      <div id="score">Score: 00000</div>
+      <div>
+        <span id="lives">Lives: 05</span>
+        <span id="armor">Armor: |||||</span>
+      </div>
+    </div>
+    <canvas id="game"></canvas>
+  </div>
   <script src="game.js"></script>
 </body>
 </html>
