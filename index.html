@@ -5,12 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simple Asteroids Game</title>
   <style>
-    body { margin: 0; background: #000; color: #fff; font-family: sans-serif; text-align: center; }
+    @import url('https://fonts.googleapis.com/css2?family=Doto:wght@100..900&display=swap');
+    body { margin: 0; background: #000; color: #fff; font-family: 'Doto', sans-serif; text-align: center; }
+    #topbar { width: 100%; text-align: left; padding: 4px 10px; box-sizing: border-box; }
+    #score { float: left; }
+    #status { float: right; }
     canvas { background: #000; display: block; margin: auto; }
+    h1 { margin-bottom: 5px; }
   </style>
 </head>
 <body>
   <h1>Asteroids</h1>
+  <div id="topbar">
+    <span id="score">Score: 00000</span>
+    <span id="status">Lives: 05&nbsp;&nbsp;Armor: |||||</span>
+  </div>
   <canvas id="game"></canvas>
   <script src="game.js"></script>
 </body>
