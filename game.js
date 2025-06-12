@@ -404,10 +404,10 @@ export default class Game {
     mctx.strokeRect(0, 0, mw, mh);
     const viewW = this.canvas.width / this.worldWidth * mw;
     const viewH = this.canvas.height / this.worldHeight * mh;
-    const vx = this.viewportX / this.worldWidth * mw;
-    const vy = this.viewportY / this.worldHeight * mh;
+    const viewX = this.viewportX / this.worldWidth * mw;
+    const viewY = this.viewportY / this.worldHeight * mh;
     mctx.strokeStyle = '#fff';
-    mctx.strokeRect(vx, vy, viewW, viewH);
+    mctx.strokeRect(viewX, viewY, viewW, viewH);
     mctx.fillStyle = '#fff';
     this.asteroids.forEach(a => {
       const x = (a.x / this.worldWidth) * mw;
