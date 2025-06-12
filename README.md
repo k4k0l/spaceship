@@ -2,7 +2,7 @@
 
 Gra to prosta wariacja na temat klasycznych **Asteroids** napisana w HTML5 i JavaScripcie. Sterujemy małym statkiem kosmicznym i staramy się przetrwać jak najdłużej w polu asteroid. Projekt ma charakter demonstracyjny i służy jako baza do dalszych eksperymentów.
 
-Aktualna wersja gry: **0.0.5**
+Aktualna wersja gry: **0.0.6**
 
 ## Co to jest za gra
 - Strzelanka zręcznościowa 2D z widokiem z góry.
@@ -11,13 +11,16 @@ Aktualna wersja gry: **0.0.5**
 - Celem jest uzyskanie jak najwyższego wyniku zanim skończy się czas lub utracimy wszystkie życia.
 
 ## Latest changes
-- Zaktualizowano do wersji **0.0.5**.
+- Zaktualizowano do wersji **0.0.6**.
 - Kompletny refaktor kodu: cała logika została przeniesiona do klasy `Game` w pliku `game.js` i uruchamiana jest z modułu `main.js`.
 - Dodano dokumentację w postaci komentarzy opisujących działanie poszczególnych metod i stałych.
 - Poprawiono strukturę projektu tak, aby łatwiej było rozwijać go w przyszłości.
 - Naprawiono błąd uniemożliwiający uruchomienie gry w przeglądarce (podwójna
   deklaracja zmiennych w funkcji rysującej minimapę).
 - Dodano wrogie statki-emoji, poprawiono grawitację i minimapę oraz sygnały dźwiękowe.
+- Uproszczone menu ustawień – parametry gry edytujemy teraz w polu tekstowym z JSON-em.
+- Dodano współczynnik `gravityMultiplier` regulujący siłę grawitacji.
+- Na minimapce pojawiła się strzałka prędkości statku oraz pulsujące okręgi namierzania przeciwników.
 
 ## Możliwości gry i przebieg rozgrywki
 - Sterowanie statkiem (obrót, przyspieszanie, strzał).
@@ -35,7 +38,10 @@ Aktualna wersja gry: **0.0.5**
 - `PICKUP_SIZE` – rozmiar bonusu na planszy.
 - `EXHAUST_LIFE` – czas trwania cząsteczek spalin.
  - `ROUND_TIME` – czas trwania jednej rundy (150 sekund).
+- `GRAVITY_MULT` – współczynnik siły grawitacji (0.2 domyślnie).
 - `MIN_ASTEROID_RADIUS` – minimalny promień powstałych odłamków asteroidy.
+
+Wszystkie powyższe wartości można teraz modyfikować w menu **Ustawienia**. Parametry zapisane są w małym pliku JSON wraz z komentarzami objaśniającymi znaczenie poszczególnych opcji.
 
 ## Zasady fizyki
 - **Ruch statku i asteroid:** położenie aktualizowane jest według wzoru `x = x + v * dt`, gdzie `v` to aktualna prędkość, a `dt` to czas między klatkami.

@@ -15,19 +15,24 @@ const creditsBtn = document.getElementById('creditsBtn');
 const backBtn = document.getElementById('backBtn');
 const creditsBack = document.getElementById('creditsBack');
 
-const worldSizeInput = document.getElementById('worldSize');
-const shipSizeInput = document.getElementById('shipSize');
-const shipMassInput = document.getElementById('shipMass');
-const roundTimeInput = document.getElementById('roundTime');
-const minAstInput = document.getElementById('minAst');
-const maxAstInput = document.getElementById('maxAst');
-const maxPlanetsInput = document.getElementById('maxPlanets');
-const minEnemiesInput = document.getElementById('minEnemies');
-const maxEnemiesInput = document.getElementById('maxEnemies');
+const settingsText = document.getElementById('settingsText');
 const menuStars = document.getElementById('menuStars');
 
 let starAnim;
 let starField = [];
+
+const defaultSettingsText = `{
+  "worldSize": 3000, // rozmiar planszy
+  "shipSize": 20,    // promień statku
+  "shipMass": 5,     // masa statku
+  "roundTime": 150,  // czas rundy w sekundach
+  "minAsteroids": 10, // minimalna liczba asteroid
+  "maxAsteroids": 100, // maksymalna liczba asteroid
+  "maxPlanets": 3,   // maksymalna liczba planet
+  "minEnemies": 3,   // minimalna liczba przeciwników
+  "maxEnemies": 10,  // maksymalna liczba przeciwników
+  "gravityMultiplier": 0.2 // współczynnik grawitacji
+}`;
 
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
@@ -132,6 +137,7 @@ function showMenu() {
 function showSettings() {
   hideScreens();
   settingsScreen.classList.remove('hidden');
+  settingsText.value = defaultSettingsText;
 }
 
 function showCredits() {
@@ -151,16 +157,26 @@ function startGame() {
   hideCredits();
   hideScreens();
   if (audioCtx) audioCtx.resume();
-  Game.DEFAULT_SHIP_RADIUS = parseInt(shipSizeInput.value) || Game.DEFAULT_SHIP_RADIUS;
-  Game.DEFAULT_SHIP_MASS = parseInt(shipMassInput.value) || Game.DEFAULT_SHIP_MASS;
-  Game.ROUND_TIME = parseInt(roundTimeInput.value) || Game.ROUND_TIME;
+  let cfgText = settingsText.value || defaultSettingsText;
+  let cfg;
+  try {
+    cfg = JSON.parse(cfgText.replace(/\/\/.*$/gm, ''));
+  } catch (e) {
+    alert('B\u0142\u0119dny format ustawie\u0144!');
+    showSettings();
+    return;
+  }
+  Game.DEFAULT_SHIP_RADIUS = parseInt(cfg.shipSize) || Game.DEFAULT_SHIP_RADIUS;
+  Game.DEFAULT_SHIP_MASS = parseInt(cfg.shipMass) || Game.DEFAULT_SHIP_MASS;
+  Game.ROUND_TIME = parseInt(cfg.roundTime) || Game.ROUND_TIME;
+  Game.GRAVITY_MULT = parseFloat(cfg.gravityMultiplier) || Game.GRAVITY_MULT;
   const settings = {
-    worldSize: parseInt(worldSizeInput.value) || Game.WORLD_SIZE,
-    minAsteroids: parseInt(minAstInput.value) || Game.MIN_INITIAL_ASTEROIDS,
-    maxAsteroids: parseInt(maxAstInput.value) || Game.MAX_INITIAL_ASTEROIDS,
-    maxPlanets: parseInt(maxPlanetsInput.value) || Game.MAX_PLANETS,
-    minEnemies: parseInt(minEnemiesInput.value) || Game.MIN_ENEMIES,
-    maxEnemies: parseInt(maxEnemiesInput.value) || Game.MAX_ENEMIES
+    worldSize: parseInt(cfg.worldSize) || Game.WORLD_SIZE,
+    minAsteroids: parseInt(cfg.minAsteroids) || Game.MIN_INITIAL_ASTEROIDS,
+    maxAsteroids: parseInt(cfg.maxAsteroids) || Game.MAX_INITIAL_ASTEROIDS,
+    maxPlanets: parseInt(cfg.maxPlanets) || Game.MAX_PLANETS,
+    minEnemies: parseInt(cfg.minEnemies) || Game.MIN_ENEMIES,
+    maxEnemies: parseInt(cfg.maxEnemies) || Game.MAX_ENEMIES
   };
   game = new Game(canvas, mapCanvas, scoreEl, livesEl, armorEl, timerEl, settings);
   game.start(showMenu);
