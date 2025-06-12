@@ -88,7 +88,7 @@ function renderStars() {
   ctx.fillRect(0, 0, w, h);
   ctx.strokeStyle = '#fff';
   for (const s of starField) {
-    s.z -= 20;
+    s.z -= 10;
     if (s.z <= 0) {
       s.x = (Math.random() - 0.5) * w;
       s.y = (Math.random() - 0.5) * h;
