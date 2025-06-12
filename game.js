@@ -596,12 +596,14 @@ class Game {
     }
     this.updateTimer();
 
+    // accumulate gravity acceleration for diagnostics
+    let gx = 0, gy = 0;
+
     if (this.ship.dead) {
       this.shipFragments.forEach(f => { f.x += f.dx; f.y += f.dy; f.rot += f.dr * dt; });
       this.respawnTimer -= dt;
       if (this.respawnTimer <= 0) this.respawnShip();
     } else {
-      let gx = 0, gy = 0;
       if (this.keys[Game.KEY_LEFT] || this.keys[Game.KEY_A]) this.ship.angle -= 3 * dt;
       if (this.keys[Game.KEY_RIGHT] || this.keys[Game.KEY_D]) this.ship.angle += 3 * dt;
 
