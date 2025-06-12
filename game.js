@@ -16,12 +16,14 @@ const KEY_RIGHT = 39;
 const KEY_SPACE = 32;
 
 const startAngle = Math.random() * Math.PI * 2;
+const DEFAULT_SHIP_RADIUS = 20;
+const DEFAULT_SHIP_MASS = 5;
 const ship = {
   x: canvas.width / 2,
   y: canvas.height / 2,
   angle: 0,
-  radius: 20,
-  mass: 5,
+  radius: DEFAULT_SHIP_RADIUS,
+  mass: DEFAULT_SHIP_MASS,
   thrust: {
     x: Math.cos(startAngle) * 0.5,
     y: Math.sin(startAngle) * 0.5
@@ -50,6 +52,12 @@ let armor = 5;
 let score = 0;
 const palette = ['#fff','#0ff','#f0f','#ff0','#0f0','#f00','#00f','#f80'];
 const BULLET_LIFE = 3; // seconds bullets stay alive
+const SIZE_EFFECT_DURATION = 30;
+let sizeTimer = 0;
+let sizeFactor = 1;
+let exhaust = [];
+const PICKUP_SIZE = DEFAULT_SHIP_RADIUS;
+const EXHAUST_LIFE = 0.5;
 
 function updateTopbar(){
   scoreEl.textContent = 'Score: ' + String(Math.floor(score)).padStart(5,'0');
@@ -115,25 +123,25 @@ function spawnAsteroid() {
 }
 
 function spawnPickup(){
-  const size = ship.radius;
+  const size = PICKUP_SIZE;
   const x = Math.random() * canvas.width;
   const y = Math.random() * canvas.height;
   const ang = Math.random() * Math.PI * 2;
   const spd = Math.random() * 0.3 + 0.1;
   const dx = Math.cos(ang)*spd;
   const dy = Math.sin(ang)*spd;
-  pickups.push({x,y,dx,dy,size,hp:15,letter:'S'});
+  pickups.push({x,y,dx,dy,size,hp:15,letter:'S',ttl:15});
 }
 
 function breakAsteroid(a, impactAngle) {
-  const count = Math.max(1, Math.floor(a.radius / 20));
-  for (let i = 0; i < count; i++) {
-    const angle = count===1 ? impactAngle + Math.PI :
-      impactAngle + Math.PI + (Math.random() - 0.5) * Math.PI / 2;
+  const pieces = Math.max(2, Math.floor(a.radius / 20));
+  for (let i = 0; i < pieces; i++) {
+    const angle = impactAngle + Math.PI + (i/pieces)*Math.PI*2 + (Math.random()-0.5)*Math.PI/pieces;
     const speed = Math.random() * 0.5 + 0.2;
     const dx = Math.cos(angle) * speed;
     const dy = Math.sin(angle) * speed;
-    const radius = a.radius / 2 * (0.5 + Math.random() * 0.5);
+    const radius = a.radius / pieces * (0.8 + Math.random()*0.4);
+    if(radius <= 8) continue;
     const pts = [];
     const pc = Math.floor(Math.random() * 5) + 5;
     for (let j = 0; j < pc; j++) {
@@ -144,10 +152,26 @@ function breakAsteroid(a, impactAngle) {
     const color = palette[Math.floor(Math.random() * palette.length)];
     const hp = Math.max(1, a.hp - 1);
     const mass = radius * 0.5;
-    if(radius > 8){
-      asteroids.push({ x: a.x, y: a.y, dx, dy, radius, points: pts, color, hp, mass });
-    }
+    asteroids.push({ x: a.x, y: a.y, dx, dy, radius, points: pts, color, hp, mass });
   }
+}
+
+function applyPickupSEffect(){
+  if(sizeTimer>0){
+    ship.radius /= sizeFactor;
+    ship.mass  /= sizeFactor;
+  }
+  let factor = Math.random() < 0.9 ? 2 : 0.5;
+  const minR = DEFAULT_SHIP_RADIUS/3;
+  const maxR = DEFAULT_SHIP_RADIUS*3;
+  let newR = ship.radius * factor;
+  if(newR>maxR) newR = maxR;
+  if(newR<minR) newR = minR;
+  factor = newR / ship.radius;
+  ship.radius = newR;
+  ship.mass *= factor;
+  sizeFactor = factor;
+  sizeTimer = SIZE_EFFECT_DURATION;
 }
 
 function explodeShip() {
@@ -189,6 +213,10 @@ function explodeShip() {
 
 function restartGame(){
   ship.dead = false;
+  ship.radius = DEFAULT_SHIP_RADIUS;
+  ship.mass = DEFAULT_SHIP_MASS;
+  sizeTimer = 0;
+  sizeFactor = 1;
   ship.x = canvas.width / 2;
   ship.y = canvas.height / 2;
   ship.angle = 0;
@@ -208,6 +236,10 @@ function restartGame(){
 
 function respawnShip(){
   ship.dead = false;
+  ship.radius = DEFAULT_SHIP_RADIUS;
+  ship.mass = DEFAULT_SHIP_MASS;
+  sizeTimer = 0;
+  sizeFactor = 1;
   ship.x = canvas.width/2;
   ship.y = canvas.height/2;
   ship.angle = 0;
@@ -248,6 +280,9 @@ function update(dt){
     if(keys[KEY_UP]){
       ship.thrust.x += Math.cos(ship.angle)*0.1;
       ship.thrust.y += Math.sin(ship.angle)*0.1;
+      const exX = ship.x - Math.cos(ship.angle)*ship.radius;
+      const exY = ship.y - Math.sin(ship.angle)*ship.radius;
+      exhaust.push({x:exX,y:exY,r:2,life:EXHAUST_LIFE});
     } else {
       ship.thrust.x *= 0.99;
       ship.thrust.y *= 0.99;
@@ -268,6 +303,14 @@ function update(dt){
   spawnInvul = Math.max(0, spawnInvul - dt);
   flashTimer = Math.max(0, flashTimer - dt);
   lineFlashTimer = Math.max(0, lineFlashTimer - dt);
+  if(sizeTimer>0){
+    sizeTimer -= dt;
+    if(sizeTimer<=0){
+      ship.radius /= sizeFactor;
+      ship.mass  /= sizeFactor;
+      sizeFactor = 1;
+    }
+  }
 
   bullets.forEach((b,bi)=>{
     b.x = (b.x + b.dx + canvas.width) % canvas.width;
@@ -364,6 +407,8 @@ function update(dt){
   particles = particles.filter(p=>p.life>0);
   asteroidLines.forEach(l=>{l.x+=l.dx;l.y+=l.dy;l.life-=dt;});
   asteroidLines = asteroidLines.filter(l=>l.life>0);
+  exhaust.forEach(e=>{e.life-=dt; e.r+=40*dt;});
+  exhaust = exhaust.filter(e=>e.life>0);
 
   pickupTimer -= dt;
   if(pickupTimer<=0){
@@ -374,6 +419,13 @@ function update(dt){
   pickups.forEach((p,pi)=>{
     p.x = (p.x + p.dx + canvas.width) % canvas.width;
     p.y = (p.y + p.dy + canvas.height) % canvas.height;
+    p.ttl -= dt;
+    if(p.ttl < 2) p.size = PICKUP_SIZE * Math.max(0, p.ttl/2);
+    if(p.ttl <= 0){
+      spawnParticles(p.x,p.y,30,'#ff0',2);
+      pickups.splice(pi,1);
+      return;
+    }
 
     asteroids.forEach((a,ai)=>{
       if(Math.hypot(p.x-a.x,p.y-a.y) < p.size + a.radius){
@@ -393,8 +445,7 @@ function update(dt){
         bullets.splice(bi,1);
         spawnParticles(p.x,p.y,50,'#ff0',2);
         pickups.splice(pi,1);
-        if(Math.random()<0.5) ship.radius*=2; else ship.radius/=2;
-        ship.mass*=0.5;
+        applyPickupSEffect();
         score+=20; if(score>99999) score=99999; updateTopbar();
       }
     });
@@ -402,8 +453,7 @@ function update(dt){
     if(!ship.dead && Math.hypot(p.x-ship.x,p.y-ship.y)<p.size+ship.radius){
       spawnParticles(p.x,p.y,50,'#ff0',2);
       pickups.splice(pi,1);
-      if(Math.random()<0.5) ship.radius*=2; else ship.radius/=2;
-      ship.mass*=0.5;
+      applyPickupSEffect();
       score+=20; if(score>99999) score=99999; updateTopbar();
     } else if(p.hp<=0){
       spawnParticles(p.x,p.y,30,'#ff0',2);
@@ -413,6 +463,7 @@ function update(dt){
 }
 
 function drawWrapped(x,y,r,fn){
+  if(!isFinite(x) || !isFinite(y)) return;
   for(let ox=-1;ox<=1;ox++){
     for(let oy=-1;oy<=1;oy++){
       const nx=x+ox*canvas.width;
@@ -443,6 +494,14 @@ function draw(){
     ctx.globalAlpha = Math.max(0,p.life);
     ctx.fillStyle = p.color;
     ctx.fillRect(p.x,p.y,2,2);
+    ctx.restore();
+  });
+
+  exhaust.forEach(e=>{
+    ctx.save();
+    ctx.globalAlpha = Math.max(0,e.life/EXHAUST_LIFE);
+    ctx.strokeStyle = '#08f';
+    drawWrapped(e.x,e.y,e.r,()=>{ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,Math.PI*2);ctx.stroke();});
     ctx.restore();
   });
 
