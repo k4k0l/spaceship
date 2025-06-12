@@ -338,6 +338,18 @@ class Game {
     }
   }
 
+  /** Rotate ship 180 degrees like pressing Enter */
+  triggerEnter() {
+    const sp = Math.hypot(this.ship.thrust.x, this.ship.thrust.y);
+    if (sp > 0) {
+      this.rotateStart = this.ship.angle;
+      this.rotateTarget = Math.atan2(-this.ship.thrust.y, -this.ship.thrust.x);
+      let diff = ((this.rotateTarget - this.rotateStart + Math.PI) % (Math.PI * 2)) - Math.PI;
+      this.rotateTarget = this.rotateStart + diff;
+      this.rotateAnim = this.rotateDuration;
+    }
+  }
+
   /** Spawn lines for asteroid explosion */
   explodeAsteroid(a) {
     for (let i = 0; i < a.points.length; i++) {
@@ -634,14 +646,7 @@ class Game {
 
       if (this.keys[Game.KEY_ENTER] && !this.enterHeld) {
         this.enterHeld = true;
-        const sp = Math.hypot(this.ship.thrust.x, this.ship.thrust.y);
-        if (sp > 0) {
-          this.rotateStart = this.ship.angle;
-          this.rotateTarget = Math.atan2(-this.ship.thrust.y, -this.ship.thrust.x);
-          let diff = ((this.rotateTarget - this.rotateStart + Math.PI) % (Math.PI * 2)) - Math.PI;
-          this.rotateTarget = this.rotateStart + diff;
-          this.rotateAnim = this.rotateDuration;
-        }
+        this.triggerEnter();
       }
       if (!this.keys[Game.KEY_ENTER]) this.enterHeld = false;
       if (this.rotateAnim > 0) {
@@ -1078,7 +1083,6 @@ class Game {
       }
     });
 
-    if (this.enemies.length < this.maxEnemies) this.spawnEnemy();
     for (let ei = 0; ei < this.enemies.length; ei++) {
       const e = this.enemies[ei];
       const distToShip = Math.hypot(e.x - this.ship.x, e.y - this.ship.y);
@@ -1386,7 +1390,7 @@ Game.ENEMY_RADIUS = 20;
 Game.ENEMY_FONT_SIZE = 48;
 Game.ENEMY_MAX_SPEED = 4;
 Game.ENEMY_ACCEL = 0.05;
-Game.ENEMY_DETECTION_RADIUS = 300;
+Game.ENEMY_DETECTION_RADIUS = 600;
 Game.ENEMY_HP = 1;
 Game.PALETTE = ['#fff', '#0ff', '#f0f', '#ff0', '#0f0', '#f00', '#00f', '#f80'];
 

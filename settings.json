@@ -17,5 +17,5 @@
   "bulletMass": 0.5,
   "gravityRangeFactor": 10.5,
   "gravityWarningRatio": 0.8,
-  "enemyDetection": 300
+  "enemyDetection": 600
 }
