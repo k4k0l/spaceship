@@ -100,6 +100,13 @@ function renderStars() {
 let creditsInterval;
 let game;
 
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && game && game.running) {
+    game.running = false;
+    showMenu();
+  }
+});
+
 function hideScreens() {
   cancelAnimationFrame(starAnim);
   menu.classList.add('hidden');
