@@ -2,7 +2,7 @@
 
 Gra to prosta wariacja na temat klasycznych **Asteroids** napisana w HTML5 i JavaScripcie. Sterujemy małym statkiem kosmicznym i staramy się przetrwać jak najdłużej w polu asteroid. Projekt ma charakter demonstracyjny i służy jako baza do dalszych eksperymentów.
 
-Aktualna wersja gry: **0.0.8**
+Aktualna wersja gry: **0.0.9**
 
 ## Co to jest za gra
 - Strzelanka zręcznościowa 2D z widokiem z góry.
@@ -11,7 +11,10 @@ Aktualna wersja gry: **0.0.8**
 - Celem jest uzyskanie jak najwyższego wyniku zanim skończy się czas lub utracimy wszystkie życia.
 
 ## Latest changes
-- Zaktualizowano do wersji **0.0.8**.
+- Zaktualizowano do wersji **0.0.9**.
+- Dodano animowane obracanie statku przy wyrównywaniu kierunku lotu.
+- Zoptymalizowano viewport tak, aby w większych oknach widać było więcej planszy.
+- Zmieniono dźwięk bonusu na dłuższy motyw "tuturututu".
 - Kompletny refaktor kodu: cała logika została przeniesiona do klasy `Game` w pliku `game.js` i uruchamiana jest z modułu `main.js`.
 - Dodano dokumentację w postaci komentarzy opisujących działanie poszczególnych metod i stałych.
 - Poprawiono strukturę projektu tak, aby łatwiej było rozwijać go w przyszłości.

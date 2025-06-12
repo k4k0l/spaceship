@@ -1,6 +1,6 @@
 
 const GAME_NAME = 'Asteroids';
-const GAME_VERSION = '0.0.7';
+const GAME_VERSION = '0.0.9';
 
 const canvas = document.getElementById('game');
 const mapCanvas = document.getElementById('minimap');
@@ -133,9 +133,8 @@ window.playSound = function(type, x, y) {
   else if (type === 'explosion') playNoise(0.3);
   else if (type === 'alarm') playTone(1200, 0.05);
   else if (type === 'pickup') {
-    playTone(660, 0.1);
-    setTimeout(() => playTone(880, 0.1), 100);
-    setTimeout(() => playTone(660, 0.1), 200);
+    const notes = [660, 880, 990, 880, 660];
+    notes.forEach((n, i) => setTimeout(() => playTone(n, 0.15), i * 150));
   }
 };
 
