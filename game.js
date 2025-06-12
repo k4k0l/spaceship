@@ -82,8 +82,11 @@ class Game {
     this.minAsteroids = settings.minAsteroids || Game.MIN_INITIAL_ASTEROIDS;
     this.maxAsteroids = settings.maxAsteroids || Game.MAX_INITIAL_ASTEROIDS;
     this.maxPlanets = settings.maxPlanets || Game.MAX_PLANETS;
+    this.maxEnemies = settings.maxEnemies || Game.MAX_ENEMIES;
     this.spawnInitialAsteroids(Math.floor(Math.random() * (this.maxAsteroids - this.minAsteroids + 1)) + this.minAsteroids);
     this.spawnPlanets(this.maxPlanets);
+    this.enemies = [];
+    for (let i = 0; i < this.maxEnemies; i++) this.spawnEnemy();
   }
 
   /** Resize canvas to window size */
@@ -97,9 +100,12 @@ class Game {
   /** Update score/lives display */
   updateTopbar() {
     this.scoreEl.textContent = 'Score: ' + String(Math.floor(this.score)).padStart(5, '0');
-    this.livesEl.style.color = '#fff';
-    this.livesEl.innerHTML = 'Lives: <span style="color:#f00">' +
-      String(this.lives).padStart(2, '0') + '</span>';
+    let livesHtml = 'Lives: ';
+    for (let i = 0; i < 5; i++) {
+      if (i < this.lives) livesHtml += '<span style="color:#f00">|</span>';
+      else livesHtml += '<span style="color:#888">.</span>';
+    }
+    this.livesEl.innerHTML = livesHtml;
     let armorHtml = 'Armor: ';
     for (let i = 0; i < 5; i++) {
       if (i < this.armor) armorHtml += '<span style="color:#0f0">|</span>';
@@ -177,6 +183,19 @@ class Game {
     const y = Math.random() * this.worldHeight;
     const color = Game.PALETTE[Math.floor(Math.random() * Game.PALETTE.length)];
     this.planets.push({ x, y, radius, mass, color, shake: 0 });
+  }
+
+  spawnEnemy() {
+    const x = Math.random() * this.worldWidth;
+    const y = Math.random() * this.worldHeight;
+    this.enemies.push({
+      x, y,
+      dx: 0,
+      dy: 0,
+      angle: 0,
+      alerted: false,
+      detection: Game.ENEMY_DETECTION_RADIUS
+    });
   }
 
   /** Spawn a single asteroid */
@@ -517,8 +536,8 @@ class Game {
           vy += (dy / dist) * a;
         }
       });
-      tx = (tx + vx + this.worldWidth) % this.worldWidth;
-      ty = (ty + vy + this.worldHeight) % this.worldHeight;
+      tx += vx;
+      ty += vy;
       const mx = (tx / this.worldWidth) * mw;
       const my = (ty / this.worldHeight) * mh;
       mctx.lineTo(mx, my);
@@ -530,6 +549,23 @@ class Game {
     const sy = (this.ship.y / this.worldHeight) * mh;
     mctx.fillStyle = '#fff';
     mctx.fillRect(sx - 2, sy - 2, 4, 4);
+
+    this.enemies.forEach(e => {
+      const ex = (e.x / this.worldWidth) * mw;
+      const ey = (e.y / this.worldHeight) * mh;
+      mctx.fillStyle = '#f0f';
+      mctx.fillRect(ex - 2, ey - 2, 4, 4);
+      if (e.alerted) {
+        mctx.save();
+        mctx.setLineDash([2, 2]);
+        mctx.strokeStyle = '#f0f';
+        mctx.beginPath();
+        mctx.moveTo(ex, ey);
+        mctx.lineTo(sx, sy);
+        mctx.stroke();
+        mctx.restore();
+      }
+    });
   }
 
   /** Update game state */
@@ -616,8 +652,8 @@ class Game {
         if (distSq > 1 && distSq < range * range) {
           const dist = Math.sqrt(distSq);
           const a = Game.GRAVITY * p.mass / distSq;
-          this.ship.thrust.x += (dx / dist) * a * dt;
-          this.ship.thrust.y += (dy / dist) * a * dt;
+          this.ship.thrust.x += (dx / dist) * a;
+          this.ship.thrust.y += (dy / dist) * a;
         }
       });
       this.asteroids.forEach(a => {
@@ -629,10 +665,10 @@ class Game {
           const dist = Math.sqrt(distSq);
           const accelShip = Game.GRAVITY * a.mass / distSq;
           const accelAst = Game.GRAVITY * this.ship.mass / distSq;
-          this.ship.thrust.x += (dx / dist) * accelShip * dt;
-          this.ship.thrust.y += (dy / dist) * accelShip * dt;
-          a.dx -= (dx / dist) * accelAst * dt;
-          a.dy -= (dy / dist) * accelAst * dt;
+          this.ship.thrust.x += (dx / dist) * accelShip;
+          this.ship.thrust.y += (dy / dist) * accelShip;
+          a.dx -= (dx / dist) * accelAst;
+          a.dy -= (dy / dist) * accelAst;
         }
       });
       this.ship.x = (this.ship.x + this.ship.thrust.x + this.worldWidth) % this.worldWidth;
@@ -916,6 +952,7 @@ class Game {
       if (!this.ship.dead && Math.hypot(p.x - this.ship.x, p.y - this.ship.y) < p.size + this.ship.radius) {
         this.spawnParticles(p.x, p.y, 50, p.color, 2);
         this.pickups.splice(pi, 1);
+        if (window.playSound) window.playSound('pickup', this.ship.x, this.ship.y);
         if (p.letter === 'S') {
           this.applyPickupSizeEffect();
           this.score += 20; if (this.score > 99999) this.score = 99999; this.updateTopbar();
@@ -938,6 +975,50 @@ class Game {
         a.dx *= ratio;
         a.dy *= ratio;
       }
+    });
+
+    if (this.enemies.length < this.maxEnemies) this.spawnEnemy();
+    this.enemies.forEach(e => {
+      const distToShip = Math.hypot(e.x - this.ship.x, e.y - this.ship.y);
+      if (distToShip < e.detection && !this.ship.dead) {
+        if (!e.alerted) { e.alerted = true; if (window.playSound) window.playSound('alarm'); }
+        const dx = this.ship.x - e.x;
+        const dy = this.ship.y - e.y;
+        const d = Math.hypot(dx, dy) || 1;
+        e.dx += (dx / d) * Game.ENEMY_ACCEL;
+        e.dy += (dy / d) * Game.ENEMY_ACCEL;
+        if (distToShip < this.ship.radius + 10) this.explodeShip();
+      } else {
+        e.alerted = false;
+        e.dx += (Math.random() - 0.5) * Game.ENEMY_ACCEL;
+        e.dy += (Math.random() - 0.5) * Game.ENEMY_ACCEL;
+      }
+      this.asteroids.forEach(a => {
+        const dx = e.x - a.x;
+        const dy = e.y - a.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < a.radius + 20) {
+          e.dx += (dx / dist) * Game.ENEMY_ACCEL;
+          e.dy += (dy / dist) * Game.ENEMY_ACCEL;
+        }
+      });
+      this.planets.forEach(p => {
+        const dx = e.x - p.x;
+        const dy = e.y - p.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < p.radius + 40) {
+          e.dx += (dx / dist) * Game.ENEMY_ACCEL;
+          e.dy += (dy / dist) * Game.ENEMY_ACCEL;
+        }
+      });
+      const sp = Math.hypot(e.dx, e.dy);
+      if (sp > Game.ENEMY_MAX_SPEED) {
+        const r = Game.ENEMY_MAX_SPEED / sp;
+        e.dx *= r; e.dy *= r;
+      }
+      e.x = (e.x + e.dx + this.worldWidth) % this.worldWidth;
+      e.y = (e.y + e.dy + this.worldHeight) % this.worldHeight;
+      e.angle = Math.atan2(e.dy, e.dx);
     });
 
     this.updateCamera();
@@ -1060,6 +1141,19 @@ class Game {
       ctx.restore();
     });
 
+    this.enemies.forEach(e => {
+      ctx.save();
+      this.drawWrapped(e.x, e.y, 12, () => {
+        ctx.translate(e.x, e.y);
+        ctx.rotate(e.angle + Math.PI / 2);
+        ctx.font = '24px serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('\uD83D\uDC7E', 0, 0);
+      });
+      ctx.restore();
+    });
+
     if (this.gameOver) {
       ctx.fillStyle = 'white';
       ctx.font = '48px sans-serif';
@@ -1108,7 +1202,7 @@ Game.DEFAULT_SHIP_RADIUS = 20;
 Game.DEFAULT_SHIP_MASS = 5;
 Game.BULLET_LIFE = 3;
 Game.SIZE_EFFECT_DURATION = 30;
-Game.PICKUP_SIZE = Game.DEFAULT_SHIP_RADIUS;
+Game.PICKUP_SIZE = Game.DEFAULT_SHIP_RADIUS * 2;
 Game.EXHAUST_LIFE = 0.5;
 Game.ROUND_TIME = 150;
 Game.MIN_ASTEROID_RADIUS = 15;
@@ -1121,6 +1215,10 @@ Game.BULLET_MASS = 0.5;
 Game.GRAVITY = 3;
 Game.GRAVITY_RANGE_FACTOR = 5;
 Game.MAX_PLANETS = 3;
+Game.MAX_ENEMIES = 0;
+Game.ENEMY_MAX_SPEED = 4;
+Game.ENEMY_ACCEL = 0.05;
+Game.ENEMY_DETECTION_RADIUS = 300;
 Game.PALETTE = ['#fff', '#0ff', '#f0f', '#ff0', '#0f0', '#f00', '#00f', '#f80'];
 
 window.Game = Game;

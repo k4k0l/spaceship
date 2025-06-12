@@ -22,6 +22,7 @@ const roundTimeInput = document.getElementById('roundTime');
 const minAstInput = document.getElementById('minAst');
 const maxAstInput = document.getElementById('maxAst');
 const maxPlanetsInput = document.getElementById('maxPlanets');
+const maxEnemiesInput = document.getElementById('maxEnemies');
 const menuStars = document.getElementById('menuStars');
 
 let starAnim;
@@ -61,10 +62,16 @@ function playNoise(duration) {
 
 window.playSound = function(type, x, y) {
   if (!game) return;
-  if (!game.isOnScreen(x, y, 50)) return;
+  if (type !== 'alarm' && type !== 'pickup' && !game.isOnScreen(x, y, 50)) return;
   if (type === 'shoot') playTone(800, 0.05);
   else if (type === 'hit') playTone(400, 0.1);
   else if (type === 'explosion') playNoise(0.3);
+  else if (type === 'alarm') playTone(1200, 0.05);
+  else if (type === 'pickup') {
+    playTone(660, 0.1);
+    setTimeout(() => playTone(880, 0.1), 100);
+    setTimeout(() => playTone(660, 0.1), 200);
+  }
 };
 
 function initStarField() {
@@ -150,7 +157,8 @@ function startGame() {
     worldSize: parseInt(worldSizeInput.value) || Game.WORLD_SIZE,
     minAsteroids: parseInt(minAstInput.value) || Game.MIN_INITIAL_ASTEROIDS,
     maxAsteroids: parseInt(maxAstInput.value) || Game.MAX_INITIAL_ASTEROIDS,
-    maxPlanets: parseInt(maxPlanetsInput.value) || Game.MAX_PLANETS
+    maxPlanets: parseInt(maxPlanetsInput.value) || Game.MAX_PLANETS,
+    maxEnemies: parseInt(maxEnemiesInput.value) || Game.MAX_ENEMIES
   };
   game = new Game(canvas, mapCanvas, scoreEl, livesEl, armorEl, timerEl, settings);
   game.start(showMenu);
