@@ -8,12 +8,17 @@ export default class Game {
    * @param {HTMLElement} statusEl - element for lives/armor display
    * @param {HTMLElement} timerEl - element for timer display
    */
-  constructor(canvas, scoreEl, statusEl, timerEl) {
+  constructor(canvas, mapCanvas, scoreEl, statusEl, timerEl, settings = {}) {
     this.canvas = canvas;
+    this.mapCanvas = mapCanvas;
+    this.mapCtx = mapCanvas.getContext('2d');
     this.ctx = canvas.getContext('2d');
     this.scoreEl = scoreEl;
     this.statusEl = statusEl;
     this.timerEl = timerEl;
+
+    this.worldWidth = settings.worldSize || Game.WORLD_SIZE;
+    this.worldHeight = settings.worldSize || Game.WORLD_SIZE;
 
     this.keys = {};
     this.bullets = [];
@@ -23,6 +28,7 @@ export default class Game {
     this.asteroidLines = [];
     this.pickups = [];
     this.exhaust = [];
+    this.stars = [[], [], []];
 
     this.gameOver = false;
     this.restartTimer = 0;
@@ -40,10 +46,13 @@ export default class Game {
     this.exhaustDelay = 0;
     this.lastTime = 0;
 
+    this.viewportX = 0;
+    this.viewportY = 0;
+
     const startAngle = Math.random() * Math.PI * 2;
     this.ship = {
-      x: this.canvas.width / 2,
-      y: this.canvas.height / 2,
+      x: this.worldWidth / 2,
+      y: this.worldHeight / 2,
       angle: 0,
       radius: Game.DEFAULT_SHIP_RADIUS,
       mass: Game.DEFAULT_SHIP_MASS,
@@ -60,6 +69,7 @@ export default class Game {
     window.addEventListener('keyup', e => { this.keys[e.keyCode] = false; });
     window.addEventListener('resize', () => this.resizeCanvas());
     this.resizeCanvas();
+    this.createStars();
     this.updateTopbar();
     this.updateTimer();
     this.spawnInitialAsteroids(Math.floor(Math.random() * 10) + 1);
@@ -69,6 +79,8 @@ export default class Game {
   resizeCanvas() {
     this.canvas.width = Math.max(window.innerWidth * 0.5, 800);
     this.canvas.height = Math.max(window.innerHeight * 0.5, 600);
+    this.mapCanvas.width = 150;
+    this.mapCanvas.height = 150;
   }
 
   /** Update score/lives display */
@@ -76,6 +88,12 @@ export default class Game {
     this.scoreEl.textContent = 'Score: ' + String(Math.floor(this.score)).padStart(5, '0');
     const armorStr = ('|'.repeat(this.armor)).padEnd(5, '.');
     this.statusEl.innerHTML = 'Lives: ' + String(this.lives).padStart(2, '0') + '&nbsp;&nbsp;Armor: ' + armorStr;
+  }
+
+  /** Update camera viewport to follow the ship */
+  updateCamera() {
+    this.viewportX = Math.min(Math.max(this.ship.x - this.canvas.width / 2, 0), this.worldWidth - this.canvas.width);
+    this.viewportY = Math.min(Math.max(this.ship.y - this.canvas.height / 2, 0), this.worldHeight - this.canvas.height);
   }
 
   /** Update timer display */
@@ -93,6 +111,24 @@ export default class Game {
     this.updateTimer();
   }
 
+  /** Generate star background */
+  createStars() {
+    const layers = [0.2, 0.5, 0.8];
+    const counts = [150, 100, 70];
+    const colors = ['#777', '#bbb', '#fff'];
+    this.stars = [[], [], []];
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < counts[i]; j++) {
+        this.stars[i].push({
+          x: Math.random() * this.worldWidth,
+          y: Math.random() * this.worldHeight,
+          color: colors[i],
+          factor: layers[i]
+        });
+      }
+    }
+  }
+
   /** Spawn multiple asteroids at start */
   spawnInitialAsteroids(num) {
     for (let i = 0; i < num; i++) this.spawnAsteroid();
@@ -101,8 +137,8 @@ export default class Game {
   /** Spawn a single asteroid */
   spawnAsteroid() {
     if (this.asteroids.length >= 10) return;
-    const x = Math.random() * this.canvas.width;
-    const y = Math.random() * this.canvas.height;
+    const x = Math.random() * this.worldWidth;
+    const y = Math.random() * this.worldHeight;
     const angle = Math.random() * Math.PI * 2;
     const speed = Math.random() * 0.5 + 0.2;
     const dx = Math.cos(angle) * speed;
@@ -124,8 +160,8 @@ export default class Game {
   /** Spawn size changing pickup */
   spawnPickup() {
     const size = Game.PICKUP_SIZE;
-    const x = Math.random() * this.canvas.width;
-    const y = Math.random() * this.canvas.height;
+    const x = Math.random() * this.worldWidth;
+    const y = Math.random() * this.worldHeight;
     const ang = Math.random() * Math.PI * 2;
     const spd = Math.random() * 0.3 + 0.1;
     const dx = Math.cos(ang) * spd;
@@ -255,8 +291,8 @@ export default class Game {
     this.ship.mass = Game.DEFAULT_SHIP_MASS;
     this.sizeTimer = 0;
     this.sizeFactor = 1;
-    this.ship.x = this.canvas.width / 2;
-    this.ship.y = this.canvas.height / 2;
+    this.ship.x = this.worldWidth / 2;
+    this.ship.y = this.worldHeight / 2;
     this.ship.angle = 0;
     const ang = Math.random() * Math.PI * 2;
     this.ship.thrust.x = Math.cos(ang) * 0.5;
@@ -281,8 +317,8 @@ export default class Game {
     this.ship.mass = Game.DEFAULT_SHIP_MASS;
     this.sizeTimer = 0;
     this.sizeFactor = 1;
-    this.ship.x = this.canvas.width / 2;
-    this.ship.y = this.canvas.height / 2;
+    this.ship.x = this.worldWidth / 2;
+    this.ship.y = this.worldHeight / 2;
     this.ship.angle = 0;
     const ang = Math.random() * Math.PI * 2;
     this.ship.thrust.x = Math.cos(ang) * 0.5;
@@ -293,8 +329,8 @@ export default class Game {
     this.updateTopbar();
     let tries = 0;
     while (this.asteroids.some(a => Math.hypot(this.ship.x - a.x, this.ship.y - a.y) < this.ship.radius + a.radius + 20) && tries < 50) {
-      this.ship.x = Math.random() * this.canvas.width;
-      this.ship.y = Math.random() * this.canvas.height;
+      this.ship.x = Math.random() * this.worldWidth;
+      this.ship.y = Math.random() * this.worldHeight;
       tries++;
     }
   }
@@ -304,15 +340,57 @@ export default class Game {
     if (!isFinite(x) || !isFinite(y)) return;
     for (let ox = -1; ox <= 1; ox++) {
       for (let oy = -1; oy <= 1; oy++) {
-        const nx = x + ox * this.canvas.width;
-        const ny = y + oy * this.canvas.height;
+        const nx = x + ox * this.worldWidth - this.viewportX;
+        const ny = y + oy * this.worldHeight - this.viewportY;
         if (nx + r < 0 || nx - r > this.canvas.width || ny + r < 0 || ny - r > this.canvas.height) continue;
         this.ctx.save();
-        this.ctx.translate(ox * this.canvas.width, oy * this.canvas.height);
+        this.ctx.translate(nx - x, ny - y);
         fn();
         this.ctx.restore();
       }
     }
+  }
+
+  /** Draw parallax star background */
+  drawBackground() {
+    for (let i = 0; i < this.stars.length; i++) {
+      const layer = this.stars[i];
+      layer.forEach(s => {
+        const x = s.x - this.viewportX * s.factor;
+        const y = s.y - this.viewportY * s.factor;
+        const sx = ((x % this.worldWidth) + this.worldWidth) % this.worldWidth - this.viewportX;
+        const sy = ((y % this.worldHeight) + this.worldHeight) % this.worldHeight - this.viewportY;
+        if (sx < 0 || sx > this.canvas.width || sy < 0 || sy > this.canvas.height) return;
+        this.ctx.fillStyle = s.color;
+        this.ctx.fillRect(sx, sy, 1, 1);
+      });
+    }
+
+    // draw board edges
+    this.ctx.strokeStyle = '#fff';
+    this.ctx.strokeRect(-this.viewportX, -this.viewportY, this.worldWidth, this.worldHeight);
+  }
+
+  /** Draw mini map */
+  drawMinimap() {
+    const mctx = this.mapCtx;
+    const mw = this.mapCanvas.width;
+    const mh = this.mapCanvas.height;
+    mctx.clearRect(0, 0, mw, mh);
+    mctx.strokeStyle = '#777';
+    mctx.strokeRect(0, 0, mw, mh);
+    const viewW = this.canvas.width / this.worldWidth * mw;
+    const viewH = this.canvas.height / this.worldHeight * mh;
+    const vx = this.viewportX / this.worldWidth * mw;
+    const vy = this.viewportY / this.worldHeight * mh;
+    mctx.strokeStyle = '#fff';
+    mctx.strokeRect(vx, vy, viewW, viewH);
+    mctx.fillStyle = '#fff';
+    this.asteroids.forEach(a => {
+      const x = (a.x / this.worldWidth) * mw;
+      const y = (a.y / this.worldHeight) * mh;
+      mctx.fillRect(x - 1, y - 1, 2, 2);
+    });
   }
 
   /** Update game state */
@@ -324,7 +402,11 @@ export default class Game {
       this.asteroidLines.forEach(l => { l.x += l.dx; l.y += l.dy; l.life -= dt; });
       this.asteroidLines = this.asteroidLines.filter(l => l.life > 0);
       this.restartTimer -= dt;
-      if (this.restartTimer <= 0) this.restartGame();
+      if (this.restartTimer <= 0) {
+        this.running = false;
+        if (this.onEnd) this.onEnd();
+        return;
+      }
       return;
     }
 
@@ -359,8 +441,8 @@ export default class Game {
         this.ship.thrust.x *= 0.99;
         this.ship.thrust.y *= 0.99;
       }
-      this.ship.x = (this.ship.x + this.ship.thrust.x + this.canvas.width) % this.canvas.width;
-      this.ship.y = (this.ship.y + this.ship.thrust.y + this.canvas.height) % this.canvas.height;
+      this.ship.x = (this.ship.x + this.ship.thrust.x + this.worldWidth) % this.worldWidth;
+      this.ship.y = (this.ship.y + this.ship.thrust.y + this.worldHeight) % this.worldHeight;
       if (this.keys[Game.KEY_SPACE] && this.ship.canShoot) {
         this.bullets.push({
           x: this.ship.x + Math.cos(this.ship.angle) * this.ship.radius,
@@ -388,8 +470,8 @@ export default class Game {
     }
 
     this.bullets.forEach((b, bi) => {
-      b.x = (b.x + b.dx + this.canvas.width) % this.canvas.width;
-      b.y = (b.y + b.dy + this.canvas.height) % this.canvas.height;
+      b.x = (b.x + b.dx + this.worldWidth) % this.worldWidth;
+      b.y = (b.y + b.dy + this.worldHeight) % this.worldHeight;
       b.life -= dt;
       if (!this.ship.dead && this.spawnInvul <= 0 && Math.hypot(b.x - this.ship.x, b.y - this.ship.y) < this.ship.radius) {
         this.bullets.splice(bi, 1);
@@ -401,8 +483,8 @@ export default class Game {
     this.bullets = this.bullets.filter(b => b.life > 0);
 
     this.asteroids.forEach(a => {
-      a.x = (a.x + a.dx + this.canvas.width) % this.canvas.width;
-      a.y = (a.y + a.dy + this.canvas.height) % this.canvas.height;
+      a.x = (a.x + a.dx + this.worldWidth) % this.worldWidth;
+      a.y = (a.y + a.dy + this.worldHeight) % this.worldHeight;
       if (a.spawnDelay > 0) a.spawnDelay = Math.max(0, a.spawnDelay - dt);
     });
 
@@ -494,8 +576,8 @@ export default class Game {
     }
 
     this.pickups.forEach((p, pi) => {
-      p.x = (p.x + p.dx + this.canvas.width) % this.canvas.width;
-      p.y = (p.y + p.dy + this.canvas.height) % this.canvas.height;
+      p.x = (p.x + p.dx + this.worldWidth) % this.worldWidth;
+      p.y = (p.y + p.dy + this.worldHeight) % this.worldHeight;
       p.ttl -= dt;
       if (p.ttl < 2) p.size = Game.PICKUP_SIZE * Math.max(0, p.ttl / 2);
       if (p.ttl <= 0) {
@@ -534,6 +616,8 @@ export default class Game {
         this.pickups.splice(pi, 1);
       }
     });
+
+    this.updateCamera();
   }
 
   /** Draw current game state */
@@ -542,6 +626,7 @@ export default class Game {
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    this.drawBackground();
 
     this.asteroidLines.forEach(l => {
       ctx.save();
@@ -659,6 +744,8 @@ export default class Game {
       ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       ctx.restore();
     }
+
+    this.drawMinimap();
   }
 
   /** Main loop called by requestAnimationFrame */
@@ -667,11 +754,13 @@ export default class Game {
     this.lastTime = timestamp;
     this.update(dt);
     this.draw();
-    requestAnimationFrame(t => this.loop(t));
+    if (this.running) requestAnimationFrame(t => this.loop(t));
   }
 
   /** Start the game loop */
-  start() {
+  start(onEnd) {
+    this.onEnd = onEnd;
+    this.running = true;
     requestAnimationFrame(t => { this.lastTime = t; this.loop(t); });
   }
 }
@@ -689,4 +778,5 @@ Game.PICKUP_SIZE = Game.DEFAULT_SHIP_RADIUS;
 Game.EXHAUST_LIFE = 0.5;
 Game.ROUND_TIME = 90;
 Game.MIN_ASTEROID_RADIUS = 15;
+Game.WORLD_SIZE = 3000;
 Game.PALETTE = ['#fff', '#0ff', '#f0f', '#ff0', '#0f0', '#f00', '#00f', '#f80'];
