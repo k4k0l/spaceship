@@ -25,6 +25,11 @@ const controlsBack = document.getElementById('controlsBack');
 const aboutBack = document.getElementById('aboutBack');
 const creditsBack = document.getElementById('creditsBack');
 
+const mobileControls = document.getElementById('mobileControls');
+const mobileAccel = document.getElementById('mobileAccel');
+const mobileShoot = document.getElementById('mobileShoot');
+const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
 const settingsText = document.getElementById('settingsText');
 const resetBtn = document.getElementById('resetBtn');
 const menuStars = document.getElementById('menuStars');
@@ -34,6 +39,7 @@ const footerVersion = document.getElementById('footerVersion');
 document.title = GAME_NAME;
 menuTitle.textContent = GAME_NAME;
 footerVersion.textContent = 'Version ' + GAME_VERSION;
+if (isMobile) mobileControls.classList.remove('hidden');
 
 let starAnim;
 let starField = [];
@@ -62,7 +68,7 @@ const defaultSettingsText = `{
   "bulletMass": 0.5, // bullet mass
   "gravityRangeFactor": 10.5, // gravity effect range
   "gravityWarningRatio": 0.8, // alarm threshold
-  "enemyDetection": 300 // enemy alert radius
+  "enemyDetection": 600 // enemy alert radius
 }`;
 
 function parseJSONC(text) {
@@ -181,6 +187,24 @@ function renderStars(timestamp) {
 let creditsInterval;
 let game;
 
+if (isMobile) {
+  window.addEventListener('deviceorientation', e => {
+    if (!game || game.paused) return;
+    if (e.gamma == null) return;
+    game.keys[Game.KEY_LEFT] = e.gamma < -10;
+    game.keys[Game.KEY_RIGHT] = e.gamma > 10;
+  });
+
+  mobileAccel.addEventListener('touchstart', e => { e.preventDefault(); if (game) game.keys[Game.KEY_UP] = true; });
+  mobileAccel.addEventListener('touchend', e => { e.preventDefault(); if (game) game.keys[Game.KEY_UP] = false; });
+  mobileShoot.addEventListener('touchstart', e => { e.preventDefault(); if (game) game.keys[Game.KEY_SPACE] = true; });
+  mobileShoot.addEventListener('touchend', e => { e.preventDefault(); if (game) game.keys[Game.KEY_SPACE] = false; });
+
+  const shakeEvent = new Shake({ threshold: 15 });
+  shakeEvent.start();
+  window.addEventListener('shake', () => { if (game && !game.paused) game.triggerEnter(); }, false);
+}
+
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape' && game) {
     if (!game.paused) {
@@ -268,6 +292,9 @@ async function startGame() {
   hideCredits();
   hideScreens();
   if (audioCtx) audioCtx.resume();
+  if (isMobile && window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    try { await DeviceOrientationEvent.requestPermission(); } catch (e) {}
+  }
   let cfgText = '';
   try {
     const resp = await fetch('settings.json');
