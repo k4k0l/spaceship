@@ -5,16 +5,18 @@ export default class Game {
   /**
    * @param {HTMLCanvasElement} canvas - canvas element to draw the game
    * @param {HTMLElement} scoreEl - element for score display
-   * @param {HTMLElement} statusEl - element for lives/armor display
+   * @param {HTMLElement} livesEl - element for lives display
+   * @param {HTMLElement} armorEl - element for armor display
    * @param {HTMLElement} timerEl - element for timer display
    */
-  constructor(canvas, mapCanvas, scoreEl, statusEl, timerEl, settings = {}) {
+  constructor(canvas, mapCanvas, scoreEl, livesEl, armorEl, timerEl, settings = {}) {
     this.canvas = canvas;
     this.mapCanvas = mapCanvas;
     this.mapCtx = mapCanvas.getContext('2d');
     this.ctx = canvas.getContext('2d');
     this.scoreEl = scoreEl;
-    this.statusEl = statusEl;
+    this.livesEl = livesEl;
+    this.armorEl = armorEl;
     this.timerEl = timerEl;
 
     this.worldWidth = settings.worldSize || Game.WORLD_SIZE;
@@ -29,6 +31,7 @@ export default class Game {
     this.pickups = [];
     this.exhaust = [];
     this.stars = [[], [], []];
+    this.planets = [];
 
     this.gameOver = false;
     this.restartTimer = 0;
@@ -75,7 +78,9 @@ export default class Game {
     this.updateTimer();
     this.minAsteroids = settings.minAsteroids || Game.MIN_INITIAL_ASTEROIDS;
     this.maxAsteroids = settings.maxAsteroids || Game.MAX_INITIAL_ASTEROIDS;
+    this.maxPlanets = settings.maxPlanets || Game.MAX_PLANETS;
     this.spawnInitialAsteroids(Math.floor(Math.random() * (this.maxAsteroids - this.minAsteroids + 1)) + this.minAsteroids);
+    this.spawnPlanets(this.maxPlanets);
   }
 
   /** Resize canvas to window size */
@@ -89,8 +94,14 @@ export default class Game {
   /** Update score/lives display */
   updateTopbar() {
     this.scoreEl.textContent = 'Score: ' + String(Math.floor(this.score)).padStart(5, '0');
-    const armorStr = ('|'.repeat(this.armor)).padEnd(5, '.');
-    this.statusEl.innerHTML = 'Lives: ' + String(this.lives).padStart(2, '0') + '&nbsp;&nbsp;Armor: ' + armorStr;
+    this.livesEl.style.color = '#f00';
+    this.livesEl.textContent = 'Lives: ' + String(this.lives).padStart(2, '0');
+    let armorHtml = 'Armor: ';
+    for (let i = 0; i < 5; i++) {
+      if (i < this.armor) armorHtml += '<span style="color:#0f0">|</span>';
+      else armorHtml += '<span style="color:#888">.</span>';
+    }
+    this.armorEl.innerHTML = armorHtml;
   }
 
   /** Update camera viewport to follow the ship */
@@ -137,6 +148,19 @@ export default class Game {
   /** Spawn multiple asteroids at start */
   spawnInitialAsteroids(num) {
     for (let i = 0; i < num; i++) this.spawnAsteroid();
+  }
+
+  spawnPlanets(num) {
+    for (let i = 0; i < num; i++) this.spawnPlanet();
+  }
+
+  spawnPlanet() {
+    const radius = Math.random() * 60 + 40;
+    const mass = radius * 3;
+    const x = Math.random() * this.worldWidth;
+    const y = Math.random() * this.worldHeight;
+    const color = Game.PALETTE[Math.floor(Math.random() * Game.PALETTE.length)];
+    this.planets.push({ x, y, radius, mass, color, shake: 0 });
   }
 
   /** Spawn a single asteroid */
@@ -213,7 +237,7 @@ export default class Game {
         const r = radius * (0.7 + Math.random() * 0.3);
         pts.push({ x: Math.cos(ang) * r, y: Math.sin(ang) * r });
       }
-      const color = Game.PALETTE[Math.floor(Math.random() * Game.PALETTE.length)];
+      const color = a.color;
       const hp = Math.max(1, a.hp - 1);
       const mass = radius * 0.5;
       this.asteroids.push({ x: spawnX, y: spawnY, dx, dy, radius, points: pts, color, hp, mass, spawnDelay: 0.3 });
@@ -394,6 +418,19 @@ export default class Game {
     this.ctx.strokeRect(-this.viewportX, -this.viewportY, this.worldWidth, this.worldHeight);
   }
 
+  drawPlanets() {
+    this.planets.forEach(p => {
+      this.ctx.fillStyle = p.color;
+      if (p.shake > 0 && Math.floor(p.shake * 20) % 2 === 0) this.ctx.fillStyle = '#fff';
+      const offset = p.shake > 0 ? (Math.random() - 0.5) * 4 : 0;
+      this.drawWrapped(p.x + offset, p.y + offset, p.radius, () => {
+        this.ctx.beginPath();
+        this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        this.ctx.fill();
+      });
+    });
+  }
+
   /** Draw mini map */
   drawMinimap() {
     const mctx = this.mapCtx;
@@ -420,6 +457,14 @@ export default class Game {
       mctx.fillStyle = p.color;
       mctx.fillRect(x - 1, y - 1, 2, 2);
     });
+    this.planets.forEach(p => {
+      const x = (p.x / this.worldWidth) * mw;
+      const y = (p.y / this.worldHeight) * mh;
+      mctx.fillStyle = p.color;
+      mctx.beginPath();
+      mctx.arc(x, y, 3, 0, Math.PI * 2);
+      mctx.fill();
+    });
 
     // draw trajectory
     mctx.strokeStyle = '#fff';
@@ -429,7 +474,18 @@ export default class Game {
     let vx = this.ship.thrust.x;
     let vy = this.ship.thrust.y;
     mctx.moveTo((tx / this.worldWidth) * mw, (ty / this.worldHeight) * mh);
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 40; i++) {
+      this.planets.forEach(pl => {
+        const dx = pl.x - tx;
+        const dy = pl.y - ty;
+        const distSq = dx * dx + dy * dy;
+        if (distSq > 1) {
+          const dist = Math.sqrt(distSq);
+          const a = Game.GRAVITY * pl.mass / distSq;
+          vx += (dx / dist) * a;
+          vy += (dy / dist) * a;
+        }
+      });
       tx = (tx + vx + this.worldWidth) % this.worldWidth;
       ty = (ty + vy + this.worldHeight) % this.worldHeight;
       const mx = (tx / this.worldWidth) * mw;
@@ -462,6 +518,7 @@ export default class Game {
       return;
     }
 
+    this.planets.forEach(pl => { pl.shake = Math.max(0, pl.shake - dt); });
     this.timer -= dt;
     if (this.timer <= 0) {
       if (!this.ship.dead) this.explodeShip();
@@ -506,6 +563,17 @@ export default class Game {
         this.ship.thrust.x *= ratio;
         this.ship.thrust.y *= ratio;
       }
+      this.planets.forEach(p => {
+        const dx = p.x - this.ship.x;
+        const dy = p.y - this.ship.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq > 1) {
+          const dist = Math.sqrt(distSq);
+          const a = Game.GRAVITY * p.mass / distSq;
+          this.ship.thrust.x += (dx / dist) * a * dt;
+          this.ship.thrust.y += (dy / dist) * a * dt;
+        }
+      });
       this.ship.x = (this.ship.x + this.ship.thrust.x + this.worldWidth) % this.worldWidth;
       this.ship.y = (this.ship.y + this.ship.thrust.y + this.worldHeight) % this.worldHeight;
       if (this.keys[Game.KEY_SPACE] && this.ship.canShoot) {
@@ -516,6 +584,8 @@ export default class Game {
           dy: Math.sin(this.ship.angle) * 5 + this.ship.thrust.y,
           life: Game.BULLET_LIFE
         });
+        this.ship.thrust.x -= Math.cos(this.ship.angle) * 5 * Game.BULLET_MASS / this.ship.mass;
+        this.ship.thrust.y -= Math.sin(this.ship.angle) * 5 * Game.BULLET_MASS / this.ship.mass;
         this.ship.canShoot = false;
       }
       if (!this.keys[Game.KEY_SPACE]) this.ship.canShoot = true;
@@ -535,6 +605,17 @@ export default class Game {
     }
 
     this.bullets.forEach((b, bi) => {
+      this.planets.forEach(p => {
+        const dx = p.x - b.x;
+        const dy = p.y - b.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq > 1) {
+          const dist = Math.sqrt(distSq);
+          const a = Game.GRAVITY * p.mass / distSq;
+          b.dx += (dx / dist) * a * dt;
+          b.dy += (dy / dist) * a * dt;
+        }
+      });
       b.x = (b.x + b.dx + this.worldWidth) % this.worldWidth;
       b.y = (b.y + b.dy + this.worldHeight) % this.worldHeight;
       b.life -= dt;
@@ -548,6 +629,17 @@ export default class Game {
     this.bullets = this.bullets.filter(b => b.life > 0);
 
     this.asteroids.forEach(a => {
+      this.planets.forEach(p => {
+        const dx = p.x - a.x;
+        const dy = p.y - a.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq > 1) {
+          const dist = Math.sqrt(distSq);
+          const accel = Game.GRAVITY * p.mass / distSq;
+          a.dx += (dx / dist) * accel * dt;
+          a.dy += (dy / dist) * accel * dt;
+        }
+      });
       a.x = (a.x + a.dx + this.worldWidth) % this.worldWidth;
       a.y = (a.y + a.dy + this.worldHeight) % this.worldHeight;
       if (a.spawnDelay > 0) a.spawnDelay = Math.max(0, a.spawnDelay - dt);
@@ -627,6 +719,37 @@ export default class Game {
       }
     });
 
+    this.planets.forEach(pl => {
+      if (!this.ship.dead && Math.hypot(this.ship.x - pl.x, this.ship.y - pl.y) < this.ship.radius + pl.radius) {
+        pl.shake = Math.max(pl.shake, Math.min(1, this.ship.mass / pl.mass));
+        this.spawnParticles(this.ship.x, this.ship.y, 20, '#fff');
+        this.explodeShip();
+      }
+      this.asteroids.forEach((a, ai) => {
+        if (Math.hypot(a.x - pl.x, a.y - pl.y) < a.radius + pl.radius) {
+          pl.shake = Math.max(pl.shake, Math.min(1, a.mass / pl.mass));
+          this.spawnParticles(a.x, a.y, 20, a.color);
+          this.asteroids.splice(ai, 1);
+          this.explodeAsteroid(a);
+          this.breakAsteroid(a, Math.atan2(a.y - pl.y, a.x - pl.x));
+        }
+      });
+      this.bullets.forEach((b, bi) => {
+        if (Math.hypot(b.x - pl.x, b.y - pl.y) < pl.radius) {
+          pl.shake = Math.max(pl.shake, Math.min(1, Game.BULLET_MASS / pl.mass));
+          this.spawnParticles(b.x, b.y, 5, '#fff');
+          this.bullets.splice(bi, 1);
+        }
+      });
+      this.pickups.forEach((p, pi) => {
+        if (Math.hypot(p.x - pl.x, p.y - pl.y) < pl.radius + p.size) {
+          pl.shake = Math.max(pl.shake, Math.min(1, 1 / pl.mass));
+          this.spawnParticles(p.x, p.y, 10, p.color);
+          this.pickups.splice(pi, 1);
+        }
+      });
+    });
+
     this.particles.forEach(p => { p.x += p.dx; p.y += p.dy; p.life -= dt; });
     this.particles = this.particles.filter(p => p.life > 0);
     this.asteroidLines.forEach(l => { l.x += l.dx; l.y += l.dy; l.life -= dt; });
@@ -647,6 +770,17 @@ export default class Game {
     }
 
     this.pickups.forEach((p, pi) => {
+      this.planets.forEach(pl => {
+        const dx = pl.x - p.x;
+        const dy = pl.y - p.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq > 1) {
+          const dist = Math.sqrt(distSq);
+          const a = Game.GRAVITY * pl.mass / distSq;
+          p.dx += (dx / dist) * a * dt;
+          p.dy += (dy / dist) * a * dt;
+        }
+      });
       p.x = (p.x + p.dx + this.worldWidth) % this.worldWidth;
       p.y = (p.y + p.dy + this.worldHeight) % this.worldHeight;
       p.ttl -= dt;
@@ -715,6 +849,7 @@ export default class Game {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     this.drawBackground();
+    this.drawPlanets();
 
     this.asteroidLines.forEach(l => {
       ctx.save();
@@ -873,11 +1008,14 @@ Game.BULLET_LIFE = 3;
 Game.SIZE_EFFECT_DURATION = 30;
 Game.PICKUP_SIZE = Game.DEFAULT_SHIP_RADIUS;
 Game.EXHAUST_LIFE = 0.5;
-Game.ROUND_TIME = 90;
+Game.ROUND_TIME = 150;
 Game.MIN_ASTEROID_RADIUS = 15;
 Game.WORLD_SIZE = 3000;
 Game.MIN_INITIAL_ASTEROIDS = 10;
 Game.MAX_INITIAL_ASTEROIDS = 100;
 Game.MAX_ASTEROIDS = 100;
 Game.MAX_SPEED = 6;
+Game.BULLET_MASS = 0.5;
+Game.GRAVITY = 0.1;
+Game.MAX_PLANETS = 3;
 Game.PALETTE = ['#fff', '#0ff', '#f0f', '#ff0', '#0f0', '#f00', '#00f', '#f80'];
