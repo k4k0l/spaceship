@@ -37,6 +37,7 @@ export default class Game {
     this.flashTimer = 0;
     this.lineFlashTimer = 0;
     this.pickupTimer = 10 + Math.random() * 20;
+    this.healPickupTimer = 60 + Math.random() * 30;
     this.lives = 5;
     this.armor = 5;
     this.score = 0;
@@ -72,7 +73,9 @@ export default class Game {
     this.createStars();
     this.updateTopbar();
     this.updateTimer();
-    this.spawnInitialAsteroids(Math.floor(Math.random() * 10) + 1);
+    this.minAsteroids = settings.minAsteroids || Game.MIN_INITIAL_ASTEROIDS;
+    this.maxAsteroids = settings.maxAsteroids || Game.MAX_INITIAL_ASTEROIDS;
+    this.spawnInitialAsteroids(Math.floor(Math.random() * (this.maxAsteroids - this.minAsteroids + 1)) + this.minAsteroids);
   }
 
   /** Resize canvas to window size */
@@ -115,7 +118,8 @@ export default class Game {
   createStars() {
     const layers = [0.2, 0.5, 0.8];
     const counts = [150, 100, 70];
-    const colors = ['#777', '#bbb', '#fff'];
+    const colors = ['#bbb', '#eee', '#fff'];
+    const sizes = [2, 2, 3];
     this.stars = [[], [], []];
     for (let i = 0; i < 3; i++) {
       for (let j = 0; j < counts[i]; j++) {
@@ -123,7 +127,8 @@ export default class Game {
           x: Math.random() * this.worldWidth,
           y: Math.random() * this.worldHeight,
           color: colors[i],
-          factor: layers[i]
+          factor: layers[i],
+          size: sizes[i]
         });
       }
     }
@@ -136,9 +141,15 @@ export default class Game {
 
   /** Spawn a single asteroid */
   spawnAsteroid() {
-    if (this.asteroids.length >= 10) return;
-    const x = Math.random() * this.worldWidth;
-    const y = Math.random() * this.worldHeight;
+    if (this.asteroids.length >= Game.MAX_ASTEROIDS) return;
+    let x, y, tries = 0;
+    let safe = false;
+    while (!safe && tries < 50) {
+      x = Math.random() * this.worldWidth;
+      y = Math.random() * this.worldHeight;
+      safe = this.asteroids.every(a => Math.hypot(x - a.x, y - a.y) > a.radius + 60);
+      tries++;
+    }
     const angle = Math.random() * Math.PI * 2;
     const speed = Math.random() * 0.5 + 0.2;
     const dx = Math.cos(angle) * speed;
@@ -154,7 +165,7 @@ export default class Game {
     const color = Game.PALETTE[Math.floor(Math.random() * Game.PALETTE.length)];
     const hp = Math.max(1, Math.round(radius / 15));
     const mass = radius * 0.5;
-    this.asteroids.push({ x, y, dx, dy, radius, points, color, hp, mass, spawnDelay: 0.5 });
+    this.asteroids.push({ x, y, dx, dy, radius, points, color, hp, mass, spawnDelay: 1 });
   }
 
   /** Spawn size changing pickup */
@@ -166,7 +177,19 @@ export default class Game {
     const spd = Math.random() * 0.3 + 0.1;
     const dx = Math.cos(ang) * spd;
     const dy = Math.sin(ang) * spd;
-    this.pickups.push({ x, y, dx, dy, size, hp: 15, letter: 'S', ttl: 15 });
+    this.pickups.push({ x, y, dx, dy, size, hp: 15, letter: 'S', color: '#ff0', ttl: 15 });
+  }
+
+  /** Spawn heal pickup */
+  spawnHealPickup() {
+    const size = Game.PICKUP_SIZE;
+    const x = Math.random() * this.worldWidth;
+    const y = Math.random() * this.worldHeight;
+    const ang = Math.random() * Math.PI * 2;
+    const spd = Math.random() * 0.3 + 0.1;
+    const dx = Math.cos(ang) * spd;
+    const dy = Math.sin(ang) * spd;
+    this.pickups.push({ x, y, dx, dy, size, hp: 15, letter: 'H', color: '#f00', ttl: 15 });
   }
 
   /** Break asteroid into pieces */
@@ -362,7 +385,7 @@ export default class Game {
         const sy = ((y % this.worldHeight) + this.worldHeight) % this.worldHeight - this.viewportY;
         if (sx < 0 || sx > this.canvas.width || sy < 0 || sy > this.canvas.height) return;
         this.ctx.fillStyle = s.color;
-        this.ctx.fillRect(sx, sy, 1, 1);
+        this.ctx.fillRect(sx, sy, s.size, s.size);
       });
     }
 
@@ -391,6 +414,35 @@ export default class Game {
       const y = (a.y / this.worldHeight) * mh;
       mctx.fillRect(x - 1, y - 1, 2, 2);
     });
+    this.pickups.forEach(p => {
+      const x = (p.x / this.worldWidth) * mw;
+      const y = (p.y / this.worldHeight) * mh;
+      mctx.fillStyle = p.color;
+      mctx.fillRect(x - 1, y - 1, 2, 2);
+    });
+
+    // draw trajectory
+    mctx.strokeStyle = '#fff';
+    mctx.beginPath();
+    let tx = this.ship.x;
+    let ty = this.ship.y;
+    let vx = this.ship.thrust.x;
+    let vy = this.ship.thrust.y;
+    mctx.moveTo((tx / this.worldWidth) * mw, (ty / this.worldHeight) * mh);
+    for (let i = 0; i < 20; i++) {
+      tx = (tx + vx + this.worldWidth) % this.worldWidth;
+      ty = (ty + vy + this.worldHeight) % this.worldHeight;
+      const mx = (tx / this.worldWidth) * mw;
+      const my = (ty / this.worldHeight) * mh;
+      mctx.lineTo(mx, my);
+    }
+    mctx.stroke();
+
+    // ship
+    const sx = (this.ship.x / this.worldWidth) * mw;
+    const sy = (this.ship.y / this.worldHeight) * mh;
+    mctx.fillStyle = '#f0f';
+    mctx.fillRect(sx - 2, sy - 2, 4, 4);
   }
 
   /** Update game state */
@@ -434,12 +486,25 @@ export default class Game {
         const exX = this.ship.x - Math.cos(this.ship.angle) * this.ship.radius;
         const exY = this.ship.y - Math.sin(this.ship.angle) * this.ship.radius;
         if (this.exhaustDelay <= 0) {
-          this.exhaust.push({ x: exX, y: exY, r: 2, life: Game.EXHAUST_LIFE, color: this.ship.color });
+          this.exhaust.push({ x: exX, y: exY, r: 2, life: Game.EXHAUST_LIFE, color: this.ship.color, type: 'back' });
           this.exhaustDelay = 0.1;
         }
-      } else {
-        this.ship.thrust.x *= 0.99;
-        this.ship.thrust.y *= 0.99;
+      }
+      if (this.keys[Game.KEY_DOWN]) {
+        this.ship.thrust.x -= Math.cos(this.ship.angle) * 0.05;
+        this.ship.thrust.y -= Math.sin(this.ship.angle) * 0.05;
+        const exX = this.ship.x + Math.cos(this.ship.angle) * this.ship.radius;
+        const exY = this.ship.y + Math.sin(this.ship.angle) * this.ship.radius;
+        if (this.exhaustDelay <= 0) {
+          this.exhaust.push({ x: exX, y: exY, r: 1, life: Game.EXHAUST_LIFE, color: this.ship.color, type: 'front' });
+          this.exhaustDelay = 0.15;
+        }
+      }
+      const sv = Math.hypot(this.ship.thrust.x, this.ship.thrust.y);
+      if (sv > Game.MAX_SPEED) {
+        const ratio = Game.MAX_SPEED / sv;
+        this.ship.thrust.x *= ratio;
+        this.ship.thrust.y *= ratio;
       }
       this.ship.x = (this.ship.x + this.ship.thrust.x + this.worldWidth) % this.worldWidth;
       this.ship.y = (this.ship.y + this.ship.thrust.y + this.worldHeight) % this.worldHeight;
@@ -575,19 +640,25 @@ export default class Game {
       this.pickupTimer = 10 + Math.random() * 20;
     }
 
+    this.healPickupTimer -= dt;
+    if (this.healPickupTimer <= 0) {
+      this.spawnHealPickup();
+      this.healPickupTimer = 60 + Math.random() * 30;
+    }
+
     this.pickups.forEach((p, pi) => {
       p.x = (p.x + p.dx + this.worldWidth) % this.worldWidth;
       p.y = (p.y + p.dy + this.worldHeight) % this.worldHeight;
       p.ttl -= dt;
       if (p.ttl < 2) p.size = Game.PICKUP_SIZE * Math.max(0, p.ttl / 2);
       if (p.ttl <= 0) {
-        this.spawnParticles(p.x, p.y, 30, '#ff0', 2);
+        this.spawnParticles(p.x, p.y, 30, p.color, 2);
         this.pickups.splice(pi, 1);
         return;
       }
       this.asteroids.forEach((a, ai) => {
         if (Math.hypot(p.x - a.x, p.y - a.y) < p.size + a.radius) {
-          this.spawnParticles((p.x + a.x) / 2, (p.y + a.y) / 2, 5, '#ff0');
+          this.spawnParticles((p.x + a.x) / 2, (p.y + a.y) / 2, 5, p.color);
           p.hp -= 1;
           a.hp -= 0.5;
           if (a.hp <= 0) {
@@ -600,20 +671,37 @@ export default class Game {
       this.bullets.forEach((b, bi) => {
         if (Math.hypot(b.x - p.x, b.y - p.y) < p.size) {
           this.bullets.splice(bi, 1);
-          this.spawnParticles(p.x, p.y, 50, '#ff0', 2);
+          this.spawnParticles(p.x, p.y, 50, p.color, 2);
           this.pickups.splice(pi, 1);
-          this.applyPickupSizeEffect();
-          this.score += 20; if (this.score > 99999) this.score = 99999; this.updateTopbar();
+          if (p.letter === 'S') {
+            this.applyPickupSizeEffect();
+            this.score += 20; if (this.score > 99999) this.score = 99999; this.updateTopbar();
+          } else if (p.letter === 'H') {
+            this.lives = 5; this.armor = 5; this.updateTopbar();
+          }
         }
       });
       if (!this.ship.dead && Math.hypot(p.x - this.ship.x, p.y - this.ship.y) < p.size + this.ship.radius) {
-        this.spawnParticles(p.x, p.y, 50, '#ff0', 2);
+        this.spawnParticles(p.x, p.y, 50, p.color, 2);
         this.pickups.splice(pi, 1);
-        this.applyPickupSizeEffect();
-        this.score += 20; if (this.score > 99999) this.score = 99999; this.updateTopbar();
+        if (p.letter === 'S') {
+          this.applyPickupSizeEffect();
+          this.score += 20; if (this.score > 99999) this.score = 99999; this.updateTopbar();
+        } else if (p.letter === 'H') {
+          this.lives = 5; this.armor = 5; this.updateTopbar();
+        }
       } else if (p.hp <= 0) {
-        this.spawnParticles(p.x, p.y, 30, '#ff0', 2);
+        this.spawnParticles(p.x, p.y, 30, p.color, 2);
         this.pickups.splice(pi, 1);
+      }
+    });
+
+    this.asteroids.forEach(a => {
+      const spd = Math.hypot(a.dx, a.dy);
+      if (spd > Game.MAX_SPEED) {
+        const ratio = Game.MAX_SPEED / spd;
+        a.dx *= ratio;
+        a.dy *= ratio;
       }
     });
 
@@ -648,7 +736,7 @@ export default class Game {
       ctx.save();
       ctx.globalAlpha = Math.max(0, p.life);
       ctx.fillStyle = p.color;
-      ctx.fillRect(p.x, p.y, 2, 2);
+      this.drawWrapped(p.x, p.y, 2, () => ctx.fillRect(p.x - 1, p.y - 1, 2, 2));
       ctx.restore();
     });
 
@@ -658,7 +746,15 @@ export default class Game {
       ctx.strokeStyle = e.color;
       this.drawWrapped(e.x, e.y, e.r, () => {
         ctx.beginPath();
-        ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+        if (e.type === 'front') {
+          ctx.moveTo(e.x, e.y - e.r);
+          ctx.lineTo(e.x + e.r, e.y);
+          ctx.lineTo(e.x, e.y + e.r);
+          ctx.lineTo(e.x - e.r, e.y);
+          ctx.closePath();
+        } else {
+          ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+        }
         ctx.stroke();
       });
       ctx.restore();
@@ -716,14 +812,14 @@ export default class Game {
 
     this.pickups.forEach(p => {
       ctx.save();
-      ctx.fillStyle = '#ff0';
+      ctx.fillStyle = p.color;
       this.drawWrapped(p.x, p.y, p.size, () => {
         ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
         ctx.fillStyle = '#000';
         ctx.font = p.size + 'px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('S', p.x, p.y + 1);
+        ctx.fillText(p.letter, p.x, p.y + 1);
       });
       ctx.restore();
     });
@@ -769,6 +865,7 @@ export default class Game {
 Game.KEY_LEFT = 37;
 Game.KEY_UP = 38;
 Game.KEY_RIGHT = 39;
+Game.KEY_DOWN = 40;
 Game.KEY_SPACE = 32;
 Game.DEFAULT_SHIP_RADIUS = 20;
 Game.DEFAULT_SHIP_MASS = 5;
@@ -779,4 +876,8 @@ Game.EXHAUST_LIFE = 0.5;
 Game.ROUND_TIME = 90;
 Game.MIN_ASTEROID_RADIUS = 15;
 Game.WORLD_SIZE = 3000;
+Game.MIN_INITIAL_ASTEROIDS = 10;
+Game.MAX_INITIAL_ASTEROIDS = 100;
+Game.MAX_ASTEROIDS = 100;
+Game.MAX_SPEED = 6;
 Game.PALETTE = ['#fff', '#0ff', '#f0f', '#ff0', '#0f0', '#f00', '#00f', '#f80'];

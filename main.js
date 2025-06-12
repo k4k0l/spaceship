@@ -19,6 +19,8 @@ const worldSizeInput = document.getElementById('worldSize');
 const shipSizeInput = document.getElementById('shipSize');
 const shipMassInput = document.getElementById('shipMass');
 const roundTimeInput = document.getElementById('roundTime');
+const minAstInput = document.getElementById('minAst');
+const maxAstInput = document.getElementById('maxAst');
 
 let creditsInterval;
 let game;
@@ -58,7 +60,11 @@ function startGame() {
   Game.DEFAULT_SHIP_RADIUS = parseInt(shipSizeInput.value) || Game.DEFAULT_SHIP_RADIUS;
   Game.DEFAULT_SHIP_MASS = parseInt(shipMassInput.value) || Game.DEFAULT_SHIP_MASS;
   Game.ROUND_TIME = parseInt(roundTimeInput.value) || Game.ROUND_TIME;
-  const settings = { worldSize: parseInt(worldSizeInput.value) || Game.WORLD_SIZE };
+  const settings = {
+    worldSize: parseInt(worldSizeInput.value) || Game.WORLD_SIZE,
+    minAsteroids: parseInt(minAstInput.value) || Game.MIN_INITIAL_ASTEROIDS,
+    maxAsteroids: parseInt(maxAstInput.value) || Game.MAX_INITIAL_ASTEROIDS
+  };
   game = new Game(canvas, mapCanvas, scoreEl, statusEl, timerEl, settings);
   game.start(showMenu);
 }
