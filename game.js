@@ -51,6 +51,7 @@ class Game {
     this.armor = 5;
     this.score = 0;
     this.shieldTimer = 0;
+    this.laserTimer = 0;
     this.gravityAccel = 0;
     this.nearGravityTrap = false;
     this.timer = Game.ROUND_TIME;
@@ -238,7 +239,7 @@ class Game {
     this.asteroids.push({ x, y, dx, dy, radius, points, color, hp, mass, spawnDelay: 1 });
   }
 
-  /** Spawn size changing pickup */
+  /** Spawn shield/laser pickup */
   spawnPickup() {
     const size = Game.PICKUP_SIZE;
     const x = Math.random() * this.worldWidth;
@@ -247,7 +248,12 @@ class Game {
     const spd = Math.random() * 0.3 + 0.1;
     const dx = Math.cos(ang) * spd;
     const dy = Math.sin(ang) * spd;
-    this.pickups.push({ x, y, dx, dy, size, hp: 15, letter: 'S', color: '#ff0', ttl: 15 });
+    const laser = Math.random() < 0.7;
+    if (laser) {
+      this.pickups.push({ x, y, dx, dy, size, hp: 15, letter: 'L', color: '#0ff', ttl: 15 });
+    } else {
+      this.pickups.push({ x, y, dx, dy, size, hp: 15, letter: 'S', color: '#ff0', ttl: 15 });
+    }
   }
 
   /** Spawn heal pickup */
@@ -305,7 +311,7 @@ class Game {
   /** Activate temporary shield effect */
   applyShieldEffect() {
     this.shieldTimer = Game.SHIELD_DURATION;
-    if (window.playNoise) window.playNoise(Game.SHIELD_DURATION);
+    if (window.playTone) window.playTone(880, 0.2);
   }
 
   /** Spawn particles for explosion/exhaust */
@@ -343,7 +349,7 @@ class Game {
   explodeShip() {
     this.ship.dead = true;
     this.shipFragments = [];
-    this.flashTimer = 1;
+    this.flashTimer = 0.5;
     if (window.playSound) window.playSound('explosion', this.ship.x, this.ship.y);
     const pts = [
       { x: this.ship.radius, y: 0 },
@@ -561,10 +567,14 @@ class Game {
       }
     });
     if (this.nearGravityTrap && Math.floor(Date.now() / 250) % 2 === 0) {
+      if (window.playSound) window.playSound('alarm');
+      this.canvas.style.border = '2px solid red';
       mctx.fillStyle = '#f00';
       mctx.font = 'bold 14px sans-serif';
       mctx.textAlign = 'center';
       mctx.fillText('Terrain ahead!', mw / 2, mh / 2);
+    } else {
+      this.canvas.style.border = 'none';
     }
   }
 
@@ -634,20 +644,20 @@ class Game {
         }
       }
       if (this.keys[Game.KEY_Q]) {
-        this.ship.thrust.x += -Math.sin(this.ship.angle) * 0.035;
-        this.ship.thrust.y += Math.cos(this.ship.angle) * 0.035;
-        const exX = this.ship.x - Math.sin(this.ship.angle) * this.ship.radius;
-        const exY = this.ship.y + Math.cos(this.ship.angle) * this.ship.radius;
+        this.ship.thrust.x += Math.sin(this.ship.angle) * 0.035;
+        this.ship.thrust.y += -Math.cos(this.ship.angle) * 0.035;
+        const exX = this.ship.x + Math.sin(this.ship.angle) * this.ship.radius;
+        const exY = this.ship.y - Math.cos(this.ship.angle) * this.ship.radius;
         if (this.exhaustDelay <= 0) {
           this.exhaust.push({ x: exX, y: exY, r: 1, life: Game.EXHAUST_LIFE, color: this.ship.color, type: 'side' });
           this.exhaustDelay = 0.1;
         }
       }
       if (this.keys[Game.KEY_E]) {
-        this.ship.thrust.x += Math.sin(this.ship.angle) * 0.035;
-        this.ship.thrust.y += -Math.cos(this.ship.angle) * 0.035;
-        const exX = this.ship.x + Math.sin(this.ship.angle) * this.ship.radius;
-        const exY = this.ship.y - Math.cos(this.ship.angle) * this.ship.radius;
+        this.ship.thrust.x += -Math.sin(this.ship.angle) * 0.035;
+        this.ship.thrust.y += Math.cos(this.ship.angle) * 0.035;
+        const exX = this.ship.x - Math.sin(this.ship.angle) * this.ship.radius;
+        const exY = this.ship.y + Math.cos(this.ship.angle) * this.ship.radius;
         if (this.exhaustDelay <= 0) {
           this.exhaust.push({ x: exX, y: exY, r: 1, life: Game.EXHAUST_LIFE, color: this.ship.color, type: 'side' });
           this.exhaustDelay = 0.1;
@@ -697,16 +707,21 @@ class Game {
       this.ship.x = (this.ship.x + this.ship.thrust.x + this.worldWidth) % this.worldWidth;
       this.ship.y = (this.ship.y + this.ship.thrust.y + this.worldHeight) % this.worldHeight;
       if (this.keys[Game.KEY_SPACE] && this.ship.canShoot) {
+        const laser = this.laserTimer > 0;
         this.bullets.push({
           x: this.ship.x + Math.cos(this.ship.angle) * this.ship.radius,
           y: this.ship.y + Math.sin(this.ship.angle) * this.ship.radius,
           dx: Math.cos(this.ship.angle) * 5 + this.ship.thrust.x,
           dy: Math.sin(this.ship.angle) * 5 + this.ship.thrust.y,
-          life: Game.BULLET_LIFE
+          life: laser ? Game.BULLET_LIFE * 2 : Game.BULLET_LIFE,
+          laser,
+          angle: this.ship.angle
         });
         if (window.playSound) window.playSound('shoot', this.ship.x, this.ship.y);
-        this.ship.thrust.x -= Math.cos(this.ship.angle) * 5 * Game.BULLET_MASS / this.ship.mass * 0.5;
-        this.ship.thrust.y -= Math.sin(this.ship.angle) * 5 * Game.BULLET_MASS / this.ship.mass * 0.5;
+        if (!laser) {
+          this.ship.thrust.x -= Math.cos(this.ship.angle) * 5 * Game.BULLET_MASS / this.ship.mass * 0.5;
+          this.ship.thrust.y -= Math.sin(this.ship.angle) * 5 * Game.BULLET_MASS / this.ship.mass * 0.5;
+        }
         this.ship.canShoot = false;
       }
       if (!this.keys[Game.KEY_SPACE]) this.ship.canShoot = true;
@@ -718,6 +733,12 @@ class Game {
     if (this.exhaustDelay > 0) this.exhaustDelay -= dt;
     if (this.shieldTimer > 0) {
       this.shieldTimer -= dt;
+    }
+    if (this.laserTimer > 0) {
+      this.laserTimer -= dt;
+      this.ship.color = '#0ff';
+    } else {
+      this.ship.color = '#fff';
     }
 
     this.bullets.forEach((b, bi) => {
@@ -991,6 +1012,8 @@ class Game {
           if (p.letter === 'S') {
             this.applyShieldEffect();
             this.score += 20; if (this.score > 99999) this.score = 99999; this.updateTopbar();
+          } else if (p.letter === 'L') {
+            this.laserTimer = Game.LASER_DURATION;
           } else if (p.letter === 'H') {
             this.lives = 5; this.armor = 5; this.updateTopbar();
           } else if (p.letter === 'T') {
@@ -1006,6 +1029,8 @@ class Game {
         if (p.letter === 'S') {
           this.applyShieldEffect();
           this.score += 20; if (this.score > 99999) this.score = 99999; this.updateTopbar();
+        } else if (p.letter === 'L') {
+          this.laserTimer = Game.LASER_DURATION;
         } else if (p.letter === 'H') {
           this.lives = 5; this.armor = 5; this.updateTopbar();
         } else if (p.letter === 'T') {
@@ -1141,7 +1166,7 @@ class Game {
 
     this.exhaust.forEach(e => {
       ctx.save();
-      ctx.globalAlpha = Math.max(0, e.life / Game.EXHAUST_LIFE) * 0.5;
+      ctx.globalAlpha = Math.max(0, e.life / Game.EXHAUST_LIFE) * 0.7;
       ctx.strokeStyle = e.color;
       this.drawWrapped(e.x, e.y, e.r, () => {
         ctx.beginPath();
@@ -1176,13 +1201,15 @@ class Game {
         });
       }
       if (this.shieldTimer > 0) {
-        const col = Math.floor(Date.now() / 200) % 2 === 0 ? '#ff0' : '#fff';
-        ctx.strokeStyle = col;
+        const phase = Math.floor(Date.now() / 100) % 2 === 0;
+        ctx.strokeStyle = phase ? '#ff0' : '#fff';
+        ctx.lineWidth = phase ? 4 : 2;
         this.drawWrapped(this.ship.x, this.ship.y, this.ship.radius + 5, () => {
           ctx.beginPath();
           ctx.arc(this.ship.x, this.ship.y, this.ship.radius + 5, 0, Math.PI * 2);
           ctx.stroke();
         });
+        ctx.lineWidth = 1;
       }
     } else {
       this.shipFragments.forEach(f => {
@@ -1201,9 +1228,19 @@ class Game {
 
     this.bullets.forEach(b => {
       ctx.save();
-      ctx.fillStyle = 'white';
       ctx.globalAlpha = Math.max(0, b.life / Game.BULLET_LIFE);
-      this.drawWrapped(b.x, b.y, 2, () => ctx.fillRect(b.x - 2, b.y - 2, 4, 4));
+      if (b.laser) {
+        ctx.strokeStyle = '#0ff';
+        this.drawWrapped(b.x, b.y, 20, () => {
+          ctx.beginPath();
+          ctx.moveTo(b.x, b.y);
+          ctx.lineTo(b.x + Math.cos(b.angle) * 20, b.y + Math.sin(b.angle) * 20);
+          ctx.stroke();
+        });
+      } else {
+        ctx.fillStyle = 'white';
+        this.drawWrapped(b.x, b.y, 2, () => ctx.fillRect(b.x - 2, b.y - 2, 4, 4));
+      }
       ctx.restore();
     });
 
@@ -1299,8 +1336,9 @@ Game.DEFAULT_SHIP_RADIUS = 20;
 Game.DEFAULT_SHIP_MASS = 5;
 Game.BULLET_LIFE = 3;
 Game.SHIELD_DURATION = 30;
+Game.LASER_DURATION = 60;
 Game.PICKUP_SIZE = Game.DEFAULT_SHIP_RADIUS * 2;
-Game.EXHAUST_LIFE = 0.5;
+Game.EXHAUST_LIFE = 0.7;
 Game.ROUND_TIME = 150;
 Game.MIN_ASTEROID_RADIUS = 15;
 Game.WORLD_SIZE = 3000;
@@ -1311,8 +1349,8 @@ Game.MAX_SPEED = 4;
 Game.BULLET_MASS = 0.5;
 Game.GRAVITY = 5;
 Game.GRAVITY_MULT = 0.5;
-Game.PLANET_GRAVITY_MULT = 20;
-Game.GRAVITY_RANGE_FACTOR = 7;
+Game.PLANET_GRAVITY_MULT = 8;
+Game.GRAVITY_RANGE_FACTOR = 10.5;
 Game.SHIP_ACCEL = 0.07;
 Game.GRAVITY_WARNING_RATIO = 0.8;
 Game.MAX_PLANETS = 3;

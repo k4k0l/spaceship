@@ -18,6 +18,7 @@
     h1 { margin-bottom: 5px; font-size: 48px; }
     #menuTitle { position: relative; z-index: 1; }
     button { font-family: 'Doto', sans-serif; font-size: 48px; margin: 10px; padding: 10px 20px; }
+    .key { display:inline-block; border:1px solid #fff; border-radius:4px; padding:2px 6px; margin:0 2px; font-size:32px; }
     #footer { margin-top: 10px; font-size: 14px; color: #888; font-weight: bold;
               position: fixed; bottom: 0; left: 0; width: 100%; z-index: 101; }
     .screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #000; z-index: 100; }
@@ -45,23 +46,54 @@
   <div id="menu" class="screen">
     <canvas id="menuStars"></canvas>
     <h1 id="menuTitle">Asteroids</h1>
-    <button id="newGameBtn">Nowa gra</button>
-    <button id="settingsBtn">Ustawienia</button>
+    <button id="newGameBtn">New Game</button>
+    <button id="settingsBtn">Settings</button>
+    <button id="controlsBtn">Controls</button>
+    <button id="aboutBtn">About</button>
     <button id="creditsBtn">Credits</button>
   </div>
   <div id="settingsScreen" class="screen hidden">
-    <h2>Ustawienia</h2>
+    <h2>Settings</h2>
     <div id="settingsText" style="width:800px;height:600px;"></div>
-    <button id="resetBtn">Ustaw domyślne</button>
-    <button id="backBtn">Wróć</button>
+    <button id="resetBtn">Reset defaults</button>
+    <button id="backBtn">Back</button>
+  </div>
+  <div id="controlsScreen" class="screen hidden">
+    <h2>Controls</h2>
+    <div id="controlsInfo">
+      <p><span class="key">W</span>/<span class="key">Up</span> thrust forward</p>
+      <p><span class="key">S</span>/<span class="key">Down</span> reverse thrust</p>
+      <p><span class="key">A</span>/<span class="key">Left</span> rotate left</p>
+      <p><span class="key">D</span>/<span class="key">Right</span> rotate right</p>
+      <p><span class="key">Q</span> left strafe&nbsp;&nbsp;<span class="key">E</span> right strafe</p>
+      <p><span class="key">Space</span> shoot &nbsp;&nbsp;<span class="key">Enter</span> align velocity</p>
+      <p><span class="key">Esc</span> pause</p>
+    </div>
+    <button id="controlsBack">Back</button>
+  </div>
+  <div id="aboutScreen" class="screen hidden">
+    <h2>About</h2>
+    <div id="aboutInfo" style="width:600px;height:400px;overflow-y:auto;text-align:left">
+      <p><strong>Enemies</strong> - violet UFOs chasing the player.</p>
+      <p><strong>Pickups</strong></p>
+      <ul>
+        <li><span class="key">S</span> - temporary shield</li>
+        <li><span class="key">H</span> - full heal</li>
+        <li><span class="key">T</span> - extra time</li>
+        <li><span class="key">L</span> - laser ammo</li>
+      </ul>
+      <p><strong>Objects</strong> - asteroids, planets and stars affect movement with gravity.</p>
+      <p><strong>Weapons</strong> - basic bullets or blue lasers when pickup L is active.</p>
+    </div>
+    <button id="aboutBack">Back</button>
   </div>
   <div id="creditsScreen" class="screen hidden">
     <h2>Credits</h2>
-    <p>Stworzone z pomocą OpenAI Codex</p>
-    <button id="creditsBack">Wróć</button>
+    <p>Created with help of OpenAI Codex</p>
+    <button id="creditsBack">Back</button>
   </div>
 
-  <div id="footer"><strong id="footerVersion">Wersja</strong></div>
+  <div id="footer"><strong id="footerVersion">Version</strong></div>
 
   <script src="https://fraigo.github.io/javascript-midi-player/midiplayer/WebAudioFontPlayer.js"></script>
   <script src="https://fraigo.github.io/javascript-midi-player/midiplayer/MIDIFile.js"></script>

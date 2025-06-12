@@ -13,10 +13,16 @@ const enemiesEl = document.getElementById('enemies');
 const menu = document.getElementById('menu');
 const settingsScreen = document.getElementById('settingsScreen');
 const creditsScreen = document.getElementById('creditsScreen');
+const controlsScreen = document.getElementById('controlsScreen');
+const aboutScreen = document.getElementById('aboutScreen');
 const newGameBtn = document.getElementById('newGameBtn');
 const settingsBtn = document.getElementById('settingsBtn');
+const controlsBtn = document.getElementById('controlsBtn');
+const aboutBtn = document.getElementById('aboutBtn');
 const creditsBtn = document.getElementById('creditsBtn');
 const backBtn = document.getElementById('backBtn');
+const controlsBack = document.getElementById('controlsBack');
+const aboutBack = document.getElementById('aboutBack');
 const creditsBack = document.getElementById('creditsBack');
 
 const settingsText = document.getElementById('settingsText');
@@ -27,7 +33,7 @@ const footerVersion = document.getElementById('footerVersion');
 
 document.title = GAME_NAME;
 menuTitle.textContent = GAME_NAME;
-footerVersion.textContent = 'Wersja ' + GAME_VERSION;
+footerVersion.textContent = 'Version ' + GAME_VERSION;
 
 let starAnim;
 let starField = [];
@@ -38,17 +44,25 @@ let settingsData = '';
 const midiUrl = 'data:audio/midi;base64,TVRoZAAAAAYAAQAGAYBNVHJrAAAAGgD/WAQEAmAIAP9/AwAAQQD/UQMJiWgA/y8ATVRyawAAANoA/wMAALEAAADBUACxCj8A/1kCAAAAsQd/AJFDZIIggUMAAJFFZIFAgUUAAJFIZGCBSAAAkUdkgiCBRwAAkUNkgiCBQwAAkUhkgiCBSAAAkUpkgUCBSgAAkU1kYIFNAACRTGSCIIFMAACRSmSCIIFKAACRS2SCIIFLAACRSmSBQIFKAACRSGRggUgAAJFGZIIggUYAAJFLZIIggUsAAJFSZIIggVIAAJFPZIFAgU8AAJFLZGCBSwAAkUpkgiCBSgAAkU9kgUCBTwAAkUxkYLEHAIMAgUwAAP8vAE1UcmsAAAFAAP8DAACyAAAAwlAAsgo/AP9ZAgAAALIHfwCSTGSBQIJMAACSQ2RggkMAAJJKZIFAgkoAAJJFZGCCRQAAkkhkgUCCSAAAkkNkYIJDAACSRWSBQIJFAACSSGRggkgAAJJMZIFAgkwAAJJDZGCCQwAAkkpkgUCCSgAAkkVkYIJFAACSSGSBQIJIAACSQ2RggkMAAJJIZIFAgkgAAJJPZGCCTwAAklBkgUCCUAAAkk9kYIJPAACSTWSBQIJNAACSS2RggksAAJJKZIFAgkoAAJJIZGCCSAAAkkZkgUCCRgAAkkpkYIJKAACSS2SBQIJLAACSTWRggk0AAJJLZIFAgksAAJJIZGCCSAAAkk1kYIJNAACSSmRggkoAAJJFZGCCRQAAkkpkYIJKAACSR2RggkcAAJJFZGCyBwCDAIJFAAD/LwBNVHJrAAABQAD/AwAAswAAAMNQALMKPwD/WQIAAACzB38Ak0NkgUCDQwAAk0hkYINIAACTSmSBQINKAACTTWRgg00AAJNMZIFAg0wAAJNIZGCDSAAAk0pkgUCDSgAAk1FkYINRAACTT2SBQINPAACTSGRgg0gAAJNKZIFAg0oAAJNNZGCDTQAAk0xkgUCDTAAAk0hkYINIAACTT2SBQINPAACTU2Rgg1MAAJNUZIFAg1QAAJNSZGCDUgAAk1BkgUCDUAAAk09kYINPAACTTWSBQINNAACTS2Rgg0sAAJNKZIFAg0oAAJNGZGCDRgAAk1JkgUCDUgAAk1RkYINUAACTUmSBQINSAACTT2Rgg08AAJNRZGCDUQAAk01kYINNAACTSmRgg0oAAJNPZGCDTwAAk0xkYINMAACTSmRgswcAgwCDSgAA/y8ATVRyawAAABIA/wMAALQKPwD/WQIAAAD/LwBNVHJrAAAADgD/AwAA/1kCAAAA/y8A';
 
 const defaultSettingsText = `{
-  "worldSize": 3000, // rozmiar planszy
-  "shipSize": 20,    // promień statku
-  "shipMass": 5,     // masa statku
-  "roundTime": 150,  // czas rundy w sekundach
-  "minAsteroids": 10, // minimalna liczba asteroid
-  "maxAsteroids": 100, // maksymalna liczba asteroid
-  "maxPlanets": 3,   // maksymalna liczba planet
-  "minEnemies": 3,   // minimalna liczba przeciwników
-  "maxEnemies": 10,  // maksymalna liczba przeciwników
-  "gravityMultiplier": 0.5, // mnożnik masy obiektów
-  "planetGravityMultiplier": 20 // dodatkowy mnożnik masy planet
+  "worldSize": 3000, // map size
+  "shipSize": 20,    // ship radius
+  "shipMass": 5,     // ship mass
+  "roundTime": 150,  // round time in seconds
+  "minAsteroids": 10, // minimum asteroids
+  "maxAsteroids": 100, // maximum asteroids
+  "maxPlanets": 3,   // maximum planets
+  "minEnemies": 3,   // minimum enemies
+  "maxEnemies": 10,  // maximum enemies
+  "gravityMultiplier": 0.5, // object mass multiplier
+  "planetGravityMultiplier": 8, // extra planet mass multiplier
+  "bulletLife": 3, // bullet lifetime
+  "shieldDuration": 30, // shield time in seconds
+  "exhaustLife": 0.7, // exhaust particle life
+  "maxSpeed": 4, // maximum ship speed
+  "bulletMass": 0.5, // bullet mass
+  "gravityRangeFactor": 10.5, // gravity effect range
+  "gravityWarningRatio": 0.8, // alarm threshold
+  "enemyDetection": 300 // enemy alert radius
 }`;
 
 function parseJSONC(text) {
@@ -60,6 +74,22 @@ function generateSettingsText(values) {
     const v = values && values[key] !== undefined ? values[key] : val.trim();
     return `"${key}": ${v}${comma}`;
   });
+}
+
+function applyGameSettings(cfg) {
+  Game.DEFAULT_SHIP_RADIUS = parseInt(cfg.shipSize) || Game.DEFAULT_SHIP_RADIUS;
+  Game.DEFAULT_SHIP_MASS = parseInt(cfg.shipMass) || Game.DEFAULT_SHIP_MASS;
+  Game.ROUND_TIME = parseInt(cfg.roundTime) || Game.ROUND_TIME;
+  Game.GRAVITY_MULT = parseFloat(cfg.gravityMultiplier) || Game.GRAVITY_MULT;
+  Game.PLANET_GRAVITY_MULT = parseFloat(cfg.planetGravityMultiplier) || Game.PLANET_GRAVITY_MULT;
+  Game.BULLET_LIFE = parseFloat(cfg.bulletLife) || Game.BULLET_LIFE;
+  Game.SHIELD_DURATION = parseFloat(cfg.shieldDuration) || Game.SHIELD_DURATION;
+  Game.EXHAUST_LIFE = parseFloat(cfg.exhaustLife) || Game.EXHAUST_LIFE;
+  Game.MAX_SPEED = parseFloat(cfg.maxSpeed) || Game.MAX_SPEED;
+  Game.BULLET_MASS = parseFloat(cfg.bulletMass) || Game.BULLET_MASS;
+  Game.GRAVITY_RANGE_FACTOR = parseFloat(cfg.gravityRangeFactor) || Game.GRAVITY_RANGE_FACTOR;
+  Game.GRAVITY_WARNING_RATIO = parseFloat(cfg.gravityWarningRatio) || Game.GRAVITY_WARNING_RATIO;
+  Game.ENEMY_DETECTION_RADIUS = parseFloat(cfg.enemyDetection) || Game.ENEMY_DETECTION_RADIUS;
 }
 
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -169,12 +199,15 @@ function hideScreens() {
   if (menuMusic) menuMusic.pause();
   menu.classList.add('hidden');
   settingsScreen.classList.add('hidden');
+  controlsScreen.classList.add('hidden');
+  aboutScreen.classList.add('hidden');
   creditsScreen.classList.add('hidden');
 }
 
 function showMenu() {
   hideScreens();
   menu.classList.remove('hidden');
+  if (audioCtx) audioCtx.suspend();
   initStarField();
   starAnim = requestAnimationFrame(renderStars);
   if (!menuMusic) {
@@ -209,6 +242,16 @@ function showSettings() {
   }
 }
 
+function showControls() {
+  hideScreens();
+  controlsScreen.classList.remove('hidden');
+}
+
+function showAbout() {
+  hideScreens();
+  aboutScreen.classList.remove('hidden');
+}
+
 function showCredits() {
   hideScreens();
   creditsScreen.classList.remove('hidden');
@@ -241,11 +284,7 @@ async function startGame() {
     return;
   }
   settingsData = generateSettingsText(cfg);
-  Game.DEFAULT_SHIP_RADIUS = parseInt(cfg.shipSize) || Game.DEFAULT_SHIP_RADIUS;
-  Game.DEFAULT_SHIP_MASS = parseInt(cfg.shipMass) || Game.DEFAULT_SHIP_MASS;
-  Game.ROUND_TIME = parseInt(cfg.roundTime) || Game.ROUND_TIME;
-  Game.GRAVITY_MULT = parseFloat(cfg.gravityMultiplier) || Game.GRAVITY_MULT;
-  Game.PLANET_GRAVITY_MULT = parseFloat(cfg.planetGravityMultiplier) || Game.PLANET_GRAVITY_MULT;
+  applyGameSettings(cfg);
   const settings = {
     worldSize: parseInt(cfg.worldSize) || Game.WORLD_SIZE,
     minAsteroids: parseInt(cfg.minAsteroids) || Game.MIN_INITIAL_ASTEROIDS,
@@ -261,9 +300,30 @@ async function startGame() {
 
 newGameBtn.onclick = startGame;
 settingsBtn.onclick = showSettings;
+controlsBtn.onclick = showControls;
+aboutBtn.onclick = showAbout;
 creditsBtn.onclick = showCredits;
-backBtn.onclick = () => { settingsData = editor.getValue(); showMenu(); };
+backBtn.onclick = () => {
+  const txt = editor.getValue();
+  let cfg;
+  try {
+    cfg = parseJSONC(txt);
+  } catch (e) {
+    alert('Invalid settings!');
+    return;
+  }
+  settingsData = generateSettingsText(cfg);
+  applyGameSettings(cfg);
+  if (game) applyGameSettings(cfg);
+  showMenu();
+};
 resetBtn.onclick = () => { settingsData = defaultSettingsText; editor.setValue(defaultSettingsText, -1); };
+controlsBack.onclick = () => { showMenu(); };
+aboutBack.onclick = () => { showMenu(); };
 creditsBack.onclick = () => { hideCredits(); showMenu(); };
+
+[newGameBtn, settingsBtn, controlsBtn, aboutBtn, creditsBtn, backBtn, controlsBack, aboutBack, creditsBack, resetBtn].forEach(btn => {
+  btn.addEventListener('mouseenter', () => playTone(880, 0.05));
+});
 
 showMenu();
