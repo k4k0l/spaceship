@@ -7,9 +7,10 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Doto:wght@100..900&display=swap');
     body { margin: 0; background: #000; color: #fff; font-family: 'Doto', sans-serif; text-align: center; }
-    #topbar { width: 100%; text-align: left; padding: 4px 10px; box-sizing: border-box; }
+    #topbar { width: 100%; text-align: left; padding: 4px 10px; box-sizing: border-box; position: relative; }
     #score { float: left; }
     #status { float: right; }
+    #timer { position: absolute; left: 50%; transform: translateX(-50%); }
     canvas { background: #000; display: block; margin: auto; }
     h1 { margin-bottom: 5px; }
   </style>
@@ -18,6 +19,7 @@
   <h1>Asteroids</h1>
   <div id="topbar">
     <span id="score">Score: 00000</span>
+    <span id="timer">[01:30]</span>
     <span id="status">Lives: 05&nbsp;&nbsp;Armor: |||||</span>
   </div>
   <canvas id="game"></canvas>
