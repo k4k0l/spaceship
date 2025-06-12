@@ -737,6 +737,11 @@ class Game {
       this.nearGravityTrap = this.gravityAccel > Game.SHIP_ACCEL * Game.GRAVITY_WARNING_RATIO;
       this.ship.x = (this.ship.x + this.ship.thrust.x + this.worldWidth) % this.worldWidth;
       this.ship.y = (this.ship.y + this.ship.thrust.y + this.worldHeight) % this.worldHeight;
+      if (!this.keys[Game.KEY_UP] && !this.keys[Game.KEY_DOWN] &&
+          !this.keys[Game.KEY_Q] && !this.keys[Game.KEY_E]) {
+        this.ship.thrust.x *= Game.SHIP_DRAG;
+        this.ship.thrust.y *= Game.SHIP_DRAG;
+      }
       if (this.keys[Game.KEY_SPACE] && this.ship.canShoot) {
         const laser = this.laserTimer > 0;
         this.bullets.push({
@@ -1338,6 +1343,7 @@ class Game {
     this.lastTime = timestamp;
     if (!this.paused) this.update(dt);
     this.draw();
+    if (window.updateJoystickIndicator) window.updateJoystickIndicator();
     if (this.running) requestAnimationFrame(t => this.loop(t));
   }
 
@@ -1382,6 +1388,7 @@ Game.GRAVITY_MULT = 0.5;
 Game.PLANET_GRAVITY_MULT = 8;
 Game.GRAVITY_RANGE_FACTOR = 10.5;
 Game.SHIP_ACCEL = 0.035;
+Game.SHIP_DRAG = 0.98;
 Game.GRAVITY_WARNING_RATIO = 0.8;
 Game.MAX_PLANETS = 3;
 Game.MIN_ENEMIES = 3;

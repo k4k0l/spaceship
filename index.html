@@ -28,9 +28,32 @@
     .screen.hidden { display: none; }
     #mobileControls.hidden { display: none; }
     #mobileControls { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; pointer-events: auto; }
-    #joystick { position: absolute; width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,0.1); left: 20px; bottom: 20px; pointer-events: none; transition: opacity 0.1s; }
-    #joystick.active { background: rgba(255,255,255,0.3); }
-    #stick { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin-left: -20px; margin-top: -20px; border-radius: 50%; background: rgba(255,255,255,0.3); pointer-events: none; }
+    #joystick {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.05);
+      left: 50%;
+      top: 50%;
+      margin-left: -40px;
+      margin-top: -40px;
+      pointer-events: none;
+      transition: opacity 0.1s;
+    }
+    #joystick.active { background: rgba(255,255,255,0.2); }
+    #stick {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 40px;
+      height: 40px;
+      margin-left: -20px;
+      margin-top: -20px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
