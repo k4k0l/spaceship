@@ -1,4 +1,3 @@
-import Game from './game.js';
 
 const canvas = document.getElementById('game');
 const mapCanvas = document.getElementById('minimap');
@@ -27,6 +26,46 @@ const menuStars = document.getElementById('menuStars');
 
 let starAnim;
 let starField = [];
+
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+
+function playTone(freq, duration) {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'square';
+  osc.frequency.value = freq;
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+}
+
+function playNoise(duration) {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * duration, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const src = audioCtx.createBufferSource();
+  src.buffer = buffer;
+  const gain = audioCtx.createGain();
+  gain.gain.value = 0.1;
+  src.connect(gain);
+  gain.connect(audioCtx.destination);
+  src.start();
+  src.stop(audioCtx.currentTime + duration);
+}
+
+window.playSound = function(type, x, y) {
+  if (!game) return;
+  if (!game.isOnScreen(x, y, 50)) return;
+  if (type === 'shoot') playTone(800, 0.05);
+  else if (type === 'hit') playTone(400, 0.1);
+  else if (type === 'explosion') playNoise(0.3);
+};
 
 function initStarField() {
   menuStars.width = window.innerWidth;
@@ -110,6 +149,7 @@ function hideCredits() {
 function startGame() {
   hideCredits();
   hideScreens();
+  if (audioCtx) audioCtx.resume();
   Game.DEFAULT_SHIP_RADIUS = parseInt(shipSizeInput.value) || Game.DEFAULT_SHIP_RADIUS;
   Game.DEFAULT_SHIP_MASS = parseInt(shipMassInput.value) || Game.DEFAULT_SHIP_MASS;
   Game.ROUND_TIME = parseInt(roundTimeInput.value) || Game.ROUND_TIME;

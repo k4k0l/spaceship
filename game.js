@@ -1,7 +1,7 @@
 // Game logic module for Asteroids-like game
 // Provides Game class which manages state, updates and rendering.
 
-export default class Game {
+class Game {
   /**
    * @param {HTMLCanvasElement} canvas - canvas element to draw the game
    * @param {HTMLElement} scoreEl - element for score display
@@ -108,6 +108,14 @@ export default class Game {
   updateCamera() {
     this.viewportX = Math.min(Math.max(this.ship.x - this.canvas.width / 2, 0), this.worldWidth - this.canvas.width);
     this.viewportY = Math.min(Math.max(this.ship.y - this.canvas.height / 2, 0), this.worldHeight - this.canvas.height);
+  }
+
+  /** Check if world coordinates are visible on screen */
+  isOnScreen(x, y, margin = 0) {
+    const sx = (x - this.viewportX + this.worldWidth) % this.worldWidth;
+    const sy = (y - this.viewportY + this.worldHeight) % this.worldHeight;
+    return sx >= -margin && sx <= this.canvas.width + margin &&
+           sy >= -margin && sy <= this.canvas.height + margin;
   }
 
   /** Update timer display */
@@ -291,6 +299,7 @@ export default class Game {
         color: a.color
       });
     }
+    if (window.playSound) window.playSound('explosion', a.x, a.y);
   }
 
   /** Explode the ship and handle life loss */
@@ -298,6 +307,7 @@ export default class Game {
     this.ship.dead = true;
     this.shipFragments = [];
     this.flashTimer = 1;
+    if (window.playSound) window.playSound('explosion', this.ship.x, this.ship.y);
     const pts = [
       { x: this.ship.radius, y: 0 },
       { x: -this.ship.radius, y: this.ship.radius / 2 },
@@ -584,6 +594,7 @@ export default class Game {
           dy: Math.sin(this.ship.angle) * 5 + this.ship.thrust.y,
           life: Game.BULLET_LIFE
         });
+        if (window.playSound) window.playSound('shoot', this.ship.x, this.ship.y);
         this.ship.thrust.x -= Math.cos(this.ship.angle) * 5 * Game.BULLET_MASS / this.ship.mass;
         this.ship.thrust.y -= Math.sin(this.ship.angle) * 5 * Game.BULLET_MASS / this.ship.mass;
         this.ship.canShoot = false;
@@ -622,6 +633,7 @@ export default class Game {
       if (!this.ship.dead && this.spawnInvul <= 0 && Math.hypot(b.x - this.ship.x, b.y - this.ship.y) < this.ship.radius) {
         this.bullets.splice(bi, 1);
         this.spawnParticles(b.x, b.y, 5, '#f00');
+        if (window.playSound) window.playSound('hit', b.x, b.y);
         this.armor -= 1; this.lineFlashTimer = 1.5; this.updateTopbar();
         if (this.armor <= 0) this.explodeShip();
       }
@@ -651,6 +663,7 @@ export default class Game {
           this.bullets.splice(bi, 1);
           this.addScore(a.hp);
           this.spawnParticles(b.x, b.y, 5, a.color);
+          if (window.playSound) window.playSound('hit', b.x, b.y);
           a.dx += b.dx * 0.5 / a.mass;
           a.dy += b.dy * 0.5 / a.mass;
           a.hp -= 1;
@@ -708,6 +721,7 @@ export default class Game {
         if (this.spawnInvul <= 0) {
           this.armor -= 1; this.lineFlashTimer = 1.5; this.updateTopbar();
           this.spawnParticles(this.ship.x + Math.cos(ang) * this.ship.radius, this.ship.y + Math.sin(ang) * this.ship.radius, 10, '#f00');
+          if (window.playSound) window.playSound('hit', this.ship.x, this.ship.y);
           a.hp -= 1;
           if (this.armor <= 0) this.explodeShip();
         }
@@ -1016,6 +1030,8 @@ Game.MAX_INITIAL_ASTEROIDS = 100;
 Game.MAX_ASTEROIDS = 100;
 Game.MAX_SPEED = 6;
 Game.BULLET_MASS = 0.5;
-Game.GRAVITY = 0.1;
+Game.GRAVITY = 5;
 Game.MAX_PLANETS = 3;
 Game.PALETTE = ['#fff', '#0ff', '#f0f', '#ff0', '#0f0', '#f00', '#00f', '#f80'];
+
+window.Game = Game;
