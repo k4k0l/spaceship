@@ -8,5 +8,6 @@
   "maxPlanets": 3,
   "minEnemies": 3,
   "maxEnemies": 10,
-  "gravityMultiplier": 0.2
+  "gravityMultiplier": 0.5,
+  "planetGravityMultiplier": 20
 }

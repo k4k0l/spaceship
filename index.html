@@ -46,7 +46,8 @@
   </div>
   <div id="settingsScreen" class="screen hidden">
     <h2>Ustawienia</h2>
-    <textarea id="settingsText" rows="14" cols="40"></textarea><br>
+    <div id="settingsText" style="width:800px;height:600px;"></div>
+    <button id="resetBtn">Ustaw domyślne</button>
     <button id="backBtn">Wróć</button>
   </div>
   <div id="creditsScreen" class="screen hidden">
@@ -57,6 +58,10 @@
 
   <div id="footer"><strong>Wersja 0.0.6</strong></div>
 
+  <script src="https://fraigo.github.io/javascript-midi-player/midiplayer/WebAudioFontPlayer.js"></script>
+  <script src="https://fraigo.github.io/javascript-midi-player/midiplayer/MIDIFile.js"></script>
+  <script src="https://fraigo.github.io/javascript-midi-player/midiplayer/MIDIPlayer.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.0/ace.js"></script>
   <script src="game.js"></script>
   <script src="main.js"></script>
 </body>
