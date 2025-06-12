@@ -41,9 +41,9 @@ class Game {
     this.spawnInvul = 0;
     this.flashTimer = 0;
     this.lineFlashTimer = 0;
-    this.pickupTimer = 5 + Math.random() * 10;
-    this.healPickupTimer = 30 + Math.random() * 15;
-    this.timePickupTimer = 45 + Math.random() * 30;
+    this.pickupTimer = 3 + Math.random() * 5;
+    this.healPickupTimer = 20 + Math.random() * 10;
+    this.timePickupTimer = 30 + Math.random() * 15;
     this.lives = 5;
     this.armor = 5;
     this.score = 0;
@@ -198,7 +198,8 @@ class Game {
       angle: 0,
       alerted: false,
       alertBlink: 0,
-      detection: Game.ENEMY_DETECTION_RADIUS
+      detection: Game.ENEMY_DETECTION_RADIUS,
+      hp: Game.ENEMY_HP
     });
   }
 
@@ -776,6 +777,19 @@ class Game {
           }
         }
       });
+      this.enemies.forEach((e, ei) => {
+        if (Math.hypot(b.x - e.x, b.y - e.y) < Game.ENEMY_RADIUS) {
+          this.bullets.splice(bi, 1);
+          e.hp -= 1;
+          this.spawnParticles(e.x, e.y, 20, '#f0f');
+          if (window.playSound) window.playSound('hit', e.x, e.y);
+          if (e.hp <= 0) {
+            this.enemies.splice(ei, 1);
+            this.spawnParticles(e.x, e.y, 30, '#f0f');
+            this.score += 10; if (this.score > 99999) this.score = 99999; this.updateTopbar();
+          }
+        }
+      });
     });
 
     for (let i = 0; i < this.asteroids.length; i++) {
@@ -897,19 +911,19 @@ class Game {
     this.pickupTimer -= dt;
     if (this.pickupTimer <= 0) {
       this.spawnPickup();
-      this.pickupTimer = 5 + Math.random() * 10;
+      this.pickupTimer = 3 + Math.random() * 5;
     }
 
     this.healPickupTimer -= dt;
     if (this.healPickupTimer <= 0) {
       this.spawnHealPickup();
-      this.healPickupTimer = 30 + Math.random() * 15;
+      this.healPickupTimer = 20 + Math.random() * 10;
     }
 
     this.timePickupTimer -= dt;
     if (this.timePickupTimer <= 0) {
       this.spawnTimePickup();
-      this.timePickupTimer = 45 + Math.random() * 30;
+      this.timePickupTimer = 30 + Math.random() * 15;
     }
 
     this.pickups.forEach((p, pi) => {
@@ -991,7 +1005,8 @@ class Game {
     });
 
     if (this.enemies.length < this.maxEnemies) this.spawnEnemy();
-    this.enemies.forEach(e => {
+    for (let ei = 0; ei < this.enemies.length; ei++) {
+      const e = this.enemies[ei];
       const distToShip = Math.hypot(e.x - this.ship.x, e.y - this.ship.y);
       if (distToShip < e.detection && !this.ship.dead) {
         if (!e.alerted) { e.alerted = true; if (window.playSound) window.playSound('alarm'); }
@@ -1001,31 +1016,57 @@ class Game {
         const d = Math.hypot(dx, dy) || 1;
         e.dx += (dx / d) * Game.ENEMY_ACCEL;
         e.dy += (dy / d) * Game.ENEMY_ACCEL;
-        if (distToShip < this.ship.radius + Game.ENEMY_RADIUS) this.explodeShip();
+        if (distToShip < this.ship.radius + Game.ENEMY_RADIUS) {
+          if (this.spawnInvul <= 0) {
+            this.armor -= 1; this.lineFlashTimer = 1.5; this.updateTopbar();
+            if (this.armor <= 0) this.explodeShip();
+          }
+          this.spawnParticles(e.x, e.y, 20, '#0f0');
+          this.enemies.splice(ei, 1);
+          ei--; continue;
+        }
       } else {
         e.alerted = false;
         e.alertBlink = 0;
         e.dx += (Math.random() - 0.5) * Game.ENEMY_ACCEL;
         e.dy += (Math.random() - 0.5) * Game.ENEMY_ACCEL;
       }
-      this.asteroids.forEach(a => {
+      for (let ai = 0; ai < this.asteroids.length; ai++) {
+        const a = this.asteroids[ai];
         const dx = e.x - a.x;
         const dy = e.y - a.y;
         const dist = Math.hypot(dx, dy);
-        if (dist < a.radius + Game.ENEMY_RADIUS * 2) {
-          e.dx += (dx / dist) * Game.ENEMY_ACCEL;
-          e.dy += (dy / dist) * Game.ENEMY_ACCEL;
+        if (dist < a.radius + Game.ENEMY_RADIUS) {
+          this.spawnParticles(e.x, e.y, 20, '#f0f');
+          this.enemies.splice(ei, 1);
+          ei--; break;
         }
-      });
-      this.planets.forEach(p => {
+        if (dist < a.radius + Game.ENEMY_RADIUS * 2) {
+          const ang = Math.atan2(dy, dx);
+          e.dx += Math.cos(ang) * Game.ENEMY_ACCEL * 5;
+          e.dy += Math.sin(ang) * Game.ENEMY_ACCEL * 5;
+          e.angle = ang;
+        }
+      }
+      if (!this.enemies[ei]) continue;
+      for (let pi = 0; pi < this.planets.length; pi++) {
+        const p = this.planets[pi];
         const dx = e.x - p.x;
         const dy = e.y - p.y;
         const dist = Math.hypot(dx, dy);
-        if (dist < p.radius + Game.ENEMY_RADIUS * 4) {
-          e.dx += (dx / dist) * Game.ENEMY_ACCEL;
-          e.dy += (dy / dist) * Game.ENEMY_ACCEL;
+        if (dist < p.radius + Game.ENEMY_RADIUS) {
+          this.spawnParticles(e.x, e.y, 20, '#f0f');
+          this.enemies.splice(ei, 1);
+          ei--; break;
         }
-      });
+        if (dist < p.radius + Game.ENEMY_RADIUS * 2) {
+          const ang = Math.atan2(dy, dx);
+          e.dx += Math.cos(ang) * Game.ENEMY_ACCEL * 5;
+          e.dy += Math.sin(ang) * Game.ENEMY_ACCEL * 5;
+          e.angle = ang;
+        }
+      }
+      if (!this.enemies[ei]) continue;
       const sp = Math.hypot(e.dx, e.dy);
       if (sp > Game.ENEMY_MAX_SPEED) {
         const r = Game.ENEMY_MAX_SPEED / sp;
@@ -1034,7 +1075,7 @@ class Game {
       e.x = (e.x + e.dx + this.worldWidth) % this.worldWidth;
       e.y = (e.y + e.dy + this.worldHeight) % this.worldHeight;
       e.angle = Math.atan2(e.dy, e.dx);
-    });
+    }
 
     this.updateCamera();
   }
@@ -1245,6 +1286,7 @@ Game.ENEMY_FONT_SIZE = 48;
 Game.ENEMY_MAX_SPEED = 4;
 Game.ENEMY_ACCEL = 0.05;
 Game.ENEMY_DETECTION_RADIUS = 300;
+Game.ENEMY_HP = 1;
 Game.PALETTE = ['#fff', '#0ff', '#f0f', '#ff0', '#0f0', '#f00', '#00f', '#f80'];
 
 window.Game = Game;
