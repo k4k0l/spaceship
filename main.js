@@ -8,6 +8,7 @@ const scoreEl = document.getElementById('score');
 const livesEl = document.getElementById('lives');
 const armorEl = document.getElementById('armor');
 const timerEl = document.getElementById('timer');
+const enemiesEl = document.getElementById('enemies');
 
 const menu = document.getElementById('menu');
 const settingsScreen = document.getElementById('settingsScreen');
@@ -81,6 +82,7 @@ function playNoise(duration) {
   src.start();
   src.stop(audioCtx.currentTime + duration);
 }
+window.playNoise = playNoise;
 
 window.playSound = function(type, x, y) {
   if (!game) return;
@@ -236,7 +238,7 @@ async function startGame() {
     minEnemies: parseInt(cfg.minEnemies) || Game.MIN_ENEMIES,
     maxEnemies: parseInt(cfg.maxEnemies) || Game.MAX_ENEMIES
   };
-  game = new Game(canvas, mapCanvas, scoreEl, livesEl, armorEl, timerEl, settings);
+  game = new Game(canvas, mapCanvas, scoreEl, livesEl, armorEl, timerEl, enemiesEl, settings);
   game.paused = false;
   game.start(() => { game.paused = true; showMenu(); });
 }

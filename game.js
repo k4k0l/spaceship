@@ -9,7 +9,7 @@ class Game {
    * @param {HTMLElement} armorEl - element for armor display
    * @param {HTMLElement} timerEl - element for timer display
    */
-  constructor(canvas, mapCanvas, scoreEl, livesEl, armorEl, timerEl, settings = {}) {
+  constructor(canvas, mapCanvas, scoreEl, livesEl, armorEl, timerEl, enemiesEl, settings = {}) {
     this.canvas = canvas;
     this.mapCanvas = mapCanvas;
     this.mapCtx = mapCanvas.getContext('2d');
@@ -18,6 +18,7 @@ class Game {
     this.livesEl = livesEl;
     this.armorEl = armorEl;
     this.timerEl = timerEl;
+    this.enemiesEl = enemiesEl;
 
     this.worldWidth = settings.worldSize || Game.WORLD_SIZE;
     this.worldHeight = settings.worldSize || Game.WORLD_SIZE;
@@ -47,8 +48,9 @@ class Game {
     this.lives = 5;
     this.armor = 5;
     this.score = 0;
-    this.sizeTimer = 0;
-    this.sizeFactor = 1;
+    this.shieldTimer = 0;
+    this.gravityAccel = 0;
+    this.nearGravityTrap = false;
     this.timer = Game.ROUND_TIME;
     this.exhaustDelay = 0;
     this.lastTime = 0;
@@ -90,6 +92,7 @@ class Game {
     this.enemies = [];
     const enemyCount = Math.floor(Math.random() * (this.maxEnemies - this.minEnemies + 1)) + this.minEnemies;
     for (let i = 0; i < enemyCount; i++) this.spawnEnemy();
+    this.updateTopbar();
   }
 
   /** Resize canvas to window size */
@@ -115,6 +118,7 @@ class Game {
       else armorHtml += '<span style="color:#888">.</span>';
     }
     this.armorEl.innerHTML = armorHtml;
+    this.enemiesEl.innerHTML = 'Enemies: <span style="color:#f0f">' + this.enemies.length + '</span>';
   }
 
   /** Update camera viewport to follow the ship */
@@ -201,6 +205,7 @@ class Game {
       detection: Game.ENEMY_DETECTION_RADIUS,
       hp: Game.ENEMY_HP
     });
+    this.updateTopbar();
   }
 
   /** Spawn a single asteroid */
@@ -296,23 +301,10 @@ class Game {
     }
   }
 
-  /** Apply size pickup effect */
-  applyPickupSizeEffect() {
-    if (this.sizeTimer > 0) {
-      this.ship.radius /= this.sizeFactor;
-      this.ship.mass /= this.sizeFactor;
-    }
-    let factor = Math.random() < 0.9 ? 2 : 0.5;
-    const minR = Game.DEFAULT_SHIP_RADIUS / 3;
-    const maxR = Game.DEFAULT_SHIP_RADIUS * 3;
-    let newR = this.ship.radius * factor;
-    if (newR > maxR) newR = maxR;
-    if (newR < minR) newR = minR;
-    factor = newR / this.ship.radius;
-    this.ship.radius = newR;
-    this.ship.mass *= factor;
-    this.sizeFactor = factor;
-    this.sizeTimer = Game.SIZE_EFFECT_DURATION;
+  /** Activate temporary shield effect */
+  applyShieldEffect() {
+    this.shieldTimer = Game.SHIELD_DURATION;
+    if (window.playNoise) window.playNoise(Game.SHIELD_DURATION);
   }
 
   /** Spawn particles for explosion/exhaust */
@@ -381,6 +373,7 @@ class Game {
       this.gameOver = true;
       this.restartTimer = 5;
     } else {
+      let gx = 0, gy = 0;
       this.respawnTimer = 1;
     }
   }
@@ -390,8 +383,7 @@ class Game {
     this.ship.dead = false;
     this.ship.radius = Game.DEFAULT_SHIP_RADIUS;
     this.ship.mass = Game.DEFAULT_SHIP_MASS;
-    this.sizeTimer = 0;
-    this.sizeFactor = 1;
+    this.shieldTimer = 0;
     this.ship.x = this.worldWidth / 2;
     this.ship.y = this.worldHeight / 2;
     this.ship.angle = 0;
@@ -416,8 +408,7 @@ class Game {
     this.ship.dead = false;
     this.ship.radius = Game.DEFAULT_SHIP_RADIUS;
     this.ship.mass = Game.DEFAULT_SHIP_MASS;
-    this.sizeTimer = 0;
-    this.sizeFactor = 1;
+    this.shieldTimer = 0;
     this.ship.x = this.worldWidth / 2;
     this.ship.y = this.worldHeight / 2;
     this.ship.angle = 0;
@@ -568,6 +559,12 @@ class Game {
         mctx.restore();
       }
     });
+    if (this.nearGravityTrap && Math.floor(Date.now() / 250) % 2 === 0) {
+      mctx.fillStyle = '#f00';
+      mctx.font = 'bold 14px sans-serif';
+      mctx.textAlign = 'center';
+      mctx.fillText('Terrain ahead!', mw / 2, mh / 2);
+    }
   }
 
   /** Update game state */
@@ -666,8 +663,11 @@ class Game {
         if (distSq > 1 && distSq < range * range) {
           const dist = Math.sqrt(distSq);
           const a = Game.GRAVITY * p.mass / distSq;
-          this.ship.thrust.x += (dx / dist) * a;
-          this.ship.thrust.y += (dy / dist) * a;
+          const ax = (dx / dist) * a;
+          const ay = (dy / dist) * a;
+          this.ship.thrust.x += ax;
+          this.ship.thrust.y += ay;
+          gx += ax; gy += ay;
         }
       });
       this.asteroids.forEach(a => {
@@ -679,12 +679,17 @@ class Game {
           const dist = Math.sqrt(distSq);
           const accelShip = Game.GRAVITY * a.mass / distSq;
           const accelAst = Game.GRAVITY * this.ship.mass / distSq;
-          this.ship.thrust.x += (dx / dist) * accelShip;
-          this.ship.thrust.y += (dy / dist) * accelShip;
+          const ax = (dx / dist) * accelShip;
+          const ay = (dy / dist) * accelShip;
+          this.ship.thrust.x += ax;
+          this.ship.thrust.y += ay;
+          gx += ax; gy += ay;
           a.dx -= (dx / dist) * accelAst;
           a.dy -= (dy / dist) * accelAst;
         }
       });
+      this.gravityAccel = Math.hypot(gx, gy);
+      this.nearGravityTrap = this.gravityAccel > Game.SHIP_ACCEL * Game.GRAVITY_WARNING_RATIO;
       this.ship.x = (this.ship.x + this.ship.thrust.x + this.worldWidth) % this.worldWidth;
       this.ship.y = (this.ship.y + this.ship.thrust.y + this.worldHeight) % this.worldHeight;
       if (this.keys[Game.KEY_SPACE] && this.ship.canShoot) {
@@ -707,13 +712,8 @@ class Game {
     this.flashTimer = Math.max(0, this.flashTimer - dt);
     this.lineFlashTimer = Math.max(0, this.lineFlashTimer - dt);
     if (this.exhaustDelay > 0) this.exhaustDelay -= dt;
-    if (this.sizeTimer > 0) {
-      this.sizeTimer -= dt;
-      if (this.sizeTimer <= 0) {
-        this.ship.radius /= this.sizeFactor;
-        this.ship.mass /= this.sizeFactor;
-        this.sizeFactor = 1;
-      }
+    if (this.shieldTimer > 0) {
+      this.shieldTimer -= dt;
     }
 
     this.bullets.forEach((b, bi) => {
@@ -732,12 +732,16 @@ class Game {
       b.x = (b.x + b.dx + this.worldWidth) % this.worldWidth;
       b.y = (b.y + b.dy + this.worldHeight) % this.worldHeight;
       b.life -= dt;
-      if (!this.ship.dead && this.spawnInvul <= 0 && Math.hypot(b.x - this.ship.x, b.y - this.ship.y) < this.ship.radius) {
+      if (!this.ship.dead && Math.hypot(b.x - this.ship.x, b.y - this.ship.y) < this.ship.radius) {
         this.bullets.splice(bi, 1);
-        this.spawnParticles(b.x, b.y, 5, '#f00');
-        if (window.playSound) window.playSound('hit', b.x, b.y);
-        this.armor -= 1; this.lineFlashTimer = 1.5; this.updateTopbar();
-        if (this.armor <= 0) this.explodeShip();
+        if (this.shieldTimer > 0) {
+          this.spawnParticles(b.x, b.y, 5, '#ff0');
+        } else if (this.spawnInvul <= 0) {
+          this.spawnParticles(b.x, b.y, 5, '#f00');
+          if (window.playSound) window.playSound('hit', b.x, b.y);
+          this.armor -= 1; this.lineFlashTimer = 1.5; this.updateTopbar();
+          if (this.armor <= 0) this.explodeShip();
+        }
       }
     });
     this.bullets = this.bullets.filter(b => b.life > 0);
@@ -855,17 +859,22 @@ class Game {
         this.ship.thrust.y -= Math.sin(ang) * force * a.mass / this.ship.mass;
         a.dx += Math.cos(ang) * force * this.ship.mass / a.mass;
         a.dy += Math.sin(ang) * force * this.ship.mass / a.mass;
-        if (this.spawnInvul <= 0) {
+        if (this.shieldTimer > 0) {
+          this.spawnParticles(a.x, a.y, 20, '#ff0');
+          this.asteroids.splice(ai, 1);
+          this.explodeAsteroid(a);
+          this.breakAsteroid(a, ang);
+        } else if (this.spawnInvul <= 0) {
           this.armor -= 1; this.lineFlashTimer = 1.5; this.updateTopbar();
           this.spawnParticles(this.ship.x + Math.cos(ang) * this.ship.radius, this.ship.y + Math.sin(ang) * this.ship.radius, 10, '#f00');
           if (window.playSound) window.playSound('hit', this.ship.x, this.ship.y);
           a.hp -= 1;
           if (this.armor <= 0) this.explodeShip();
-        }
-        if (a.hp <= 0) {
-          this.asteroids.splice(ai, 1);
-          this.explodeAsteroid(a);
-          this.breakAsteroid(a, ang);
+          if (a.hp <= 0) {
+            this.asteroids.splice(ai, 1);
+            this.explodeAsteroid(a);
+            this.breakAsteroid(a, ang);
+          }
         }
       }
     });
@@ -873,8 +882,18 @@ class Game {
     this.planets.forEach(pl => {
       if (!this.ship.dead && Math.hypot(this.ship.x - pl.x, this.ship.y - pl.y) < this.ship.radius + pl.radius) {
         pl.shake = Math.max(pl.shake, Math.min(1, this.ship.mass / pl.mass));
-        this.spawnParticles(this.ship.x, this.ship.y, 20, '#fff');
-        this.explodeShip();
+        if (this.shieldTimer > 0) {
+          const ang = Math.atan2(this.ship.y - pl.y, this.ship.x - pl.x);
+          const sp = Math.hypot(this.ship.thrust.x, this.ship.thrust.y);
+          this.ship.thrust.x = Math.cos(ang) * Math.max(sp, 2);
+          this.ship.thrust.y = Math.sin(ang) * Math.max(sp, 2);
+          this.ship.x = pl.x + Math.cos(ang) * (pl.radius + this.ship.radius + 1);
+          this.ship.y = pl.y + Math.sin(ang) * (pl.radius + this.ship.radius + 1);
+          this.spawnParticles(this.ship.x, this.ship.y, 10, '#ff0');
+        } else {
+          this.spawnParticles(this.ship.x, this.ship.y, 20, '#fff');
+          this.explodeShip();
+        }
       }
       this.asteroids.forEach((a, ai) => {
         if (Math.hypot(a.x - pl.x, a.y - pl.y) < a.radius + pl.radius) {
@@ -966,7 +985,7 @@ class Game {
           this.spawnParticles(p.x, p.y, 50, p.color, 2);
           this.pickups.splice(pi, 1);
           if (p.letter === 'S') {
-            this.applyPickupSizeEffect();
+            this.applyShieldEffect();
             this.score += 20; if (this.score > 99999) this.score = 99999; this.updateTopbar();
           } else if (p.letter === 'H') {
             this.lives = 5; this.armor = 5; this.updateTopbar();
@@ -981,7 +1000,7 @@ class Game {
         this.pickups.splice(pi, 1);
         if (window.playSound) window.playSound('pickup', this.ship.x, this.ship.y);
         if (p.letter === 'S') {
-          this.applyPickupSizeEffect();
+          this.applyShieldEffect();
           this.score += 20; if (this.score > 99999) this.score = 99999; this.updateTopbar();
         } else if (p.letter === 'H') {
           this.lives = 5; this.armor = 5; this.updateTopbar();
@@ -1023,6 +1042,7 @@ class Game {
           }
           this.spawnParticles(e.x, e.y, 20, '#0f0');
           this.enemies.splice(ei, 1);
+          this.updateTopbar();
           ei--; continue;
         }
       } else {
@@ -1039,6 +1059,7 @@ class Game {
         if (dist < a.radius + Game.ENEMY_RADIUS) {
           this.spawnParticles(e.x, e.y, 20, '#f0f');
           this.enemies.splice(ei, 1);
+          this.updateTopbar();
           ei--; break;
         }
         if (dist < a.radius + Game.ENEMY_RADIUS * 2) {
@@ -1057,6 +1078,7 @@ class Game {
         if (dist < p.radius + Game.ENEMY_RADIUS) {
           this.spawnParticles(e.x, e.y, 20, '#f0f');
           this.enemies.splice(ei, 1);
+          this.updateTopbar();
           ei--; break;
         }
         if (dist < p.radius + Game.ENEMY_RADIUS * 2) {
@@ -1147,6 +1169,15 @@ class Game {
           ctx.closePath();
           ctx.stroke();
           ctx.restore();
+        });
+      }
+      if (this.shieldTimer > 0) {
+        const col = Math.floor(Date.now() / 200) % 2 === 0 ? '#ff0' : '#fff';
+        ctx.strokeStyle = col;
+        this.drawWrapped(this.ship.x, this.ship.y, this.ship.radius + 5, () => {
+          ctx.beginPath();
+          ctx.arc(this.ship.x, this.ship.y, this.ship.radius + 5, 0, Math.PI * 2);
+          ctx.stroke();
         });
       }
     } else {
@@ -1263,7 +1294,7 @@ Game.KEY_E = 69;
 Game.DEFAULT_SHIP_RADIUS = 20;
 Game.DEFAULT_SHIP_MASS = 5;
 Game.BULLET_LIFE = 3;
-Game.SIZE_EFFECT_DURATION = 30;
+Game.SHIELD_DURATION = 30;
 Game.PICKUP_SIZE = Game.DEFAULT_SHIP_RADIUS * 2;
 Game.EXHAUST_LIFE = 0.5;
 Game.ROUND_TIME = 150;
@@ -1278,6 +1309,8 @@ Game.GRAVITY = 5;
 Game.GRAVITY_MULT = 0.5;
 Game.PLANET_GRAVITY_MULT = 20;
 Game.GRAVITY_RANGE_FACTOR = 7;
+Game.SHIP_ACCEL = 0.07;
+Game.GRAVITY_WARNING_RATIO = 0.8;
 Game.MAX_PLANETS = 3;
 Game.MIN_ENEMIES = 3;
 Game.MAX_ENEMIES = 10;
