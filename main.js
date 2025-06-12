@@ -74,7 +74,7 @@ function parseJSONC(text) {
 }
 
 function generateSettingsText(values) {
-  return defaultSettingsText.replace(/"(\w+)":\s*([^,]+)(,?)/g, (m, key, val, comma) => {
+  return defaultSettingsText.replace(/"(\w+)":\s*([^,\n]+)(,?)/g, (m, key, val, comma) => {
     const v = values && values[key] !== undefined ? values[key] : val.trim();
     return `"${key}": ${v}${comma}`;
   });
@@ -211,15 +211,14 @@ if (isMobile) {
     game.keys[Game.KEY_DOWN] = false;
   }
 
-  function returnStick() {
-    const dist = Math.hypot(dx, dy);
-    const speed = Game.SHIP_ACCEL * 1000;
-    const dur = dist / speed;
-    stick.style.transition = `transform ${dur}s linear`;
-    stick.style.transform = 'translate(0px,0px)';
-    dx = dy = 0;
-    setTimeout(() => { stick.style.transition = ''; }, dur * 1000);
+  function updateIndicator() {
+    if (touchId !== null || !game) return;
+    const scale = 10;
+    const vx = game.ship.thrust.x * scale;
+    const vy = game.ship.thrust.y * scale;
+    stick.style.transform = `translate(${vx}px,${vy}px)`;
   }
+  window.updateJoystickIndicator = updateIndicator;
 
   mobileControls.addEventListener('touchstart', e => {
     e.preventDefault();
@@ -228,8 +227,6 @@ if (isMobile) {
     lpTimer = setTimeout(() => {
       longPress = true;
       touchId = t.identifier;
-      joystick.style.left = `${t.clientX - radius}px`;
-      joystick.style.top = `${t.clientY - radius}px`;
       joystick.classList.add('active');
     }, 200);
   });
@@ -240,11 +237,6 @@ if (isMobile) {
       if (t.identifier === touchId) {
         dx = t.clientX - (joystick.offsetLeft + radius);
         dy = t.clientY - (joystick.offsetTop + radius);
-        const d = Math.hypot(dx, dy);
-        if (d > radius) {
-          const r = radius / d;
-          dx *= r; dy *= r;
-        }
         stick.style.transform = `translate(${dx}px,${dy}px)`;
         updateKeys();
         break;
@@ -261,7 +253,7 @@ if (isMobile) {
       }
     } else {
       resetKeys();
-      returnStick();
+      dx = dy = 0;
       joystick.classList.remove('active');
       touchId = null;
     }
@@ -293,6 +285,7 @@ function hideScreens() {
 function showMenu() {
   hideScreens();
   menu.classList.remove('hidden');
+  if (isMobile) mobileControls.classList.add('hidden');
   if (audioCtx) audioCtx.suspend();
   initStarField();
   starAnim = requestAnimationFrame(renderStars);
@@ -354,6 +347,7 @@ function hideCredits() {
 async function startGame() {
   hideCredits();
   hideScreens();
+  if (isMobile) mobileControls.classList.remove('hidden');
   if (audioCtx) audioCtx.resume();
   let cfgText = '';
   try {
