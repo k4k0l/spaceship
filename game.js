@@ -33,6 +33,8 @@ class Game {
     this.stars = [[], [], []];
     this.planets = [];
 
+    this.paused = false;
+
     this.gameOver = false;
     this.restartTimer = 0;
     this.respawnTimer = 0;
@@ -577,9 +579,8 @@ class Game {
       this.asteroidLines = this.asteroidLines.filter(l => l.life > 0);
       this.restartTimer -= dt;
       if (this.restartTimer <= 0) {
-        this.running = false;
-        if (this.onEnd) this.onEnd();
-        return;
+        this.restartGame();
+        this.gameOver = false;
       }
       return;
     }
@@ -1192,7 +1193,7 @@ class Game {
   loop(timestamp) {
     const dt = (timestamp - this.lastTime) / 1000;
     this.lastTime = timestamp;
-    this.update(dt);
+    if (!this.paused) this.update(dt);
     this.draw();
     if (this.running) requestAnimationFrame(t => this.loop(t));
   }

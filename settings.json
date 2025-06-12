@@ -1,0 +1,12 @@
+{
+  "worldSize": 3000,
+  "shipSize": 20,
+  "shipMass": 5,
+  "roundTime": 150,
+  "minAsteroids": 10,
+  "maxAsteroids": 100,
+  "maxPlanets": 3,
+  "minEnemies": 3,
+  "maxEnemies": 10,
+  "gravityMultiplier": 0.2
+}
