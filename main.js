@@ -20,6 +20,8 @@ const menuStars = document.getElementById('menuStars');
 
 let starAnim;
 let starField = [];
+let menuMusic;
+const midiUrl = 'https://files.khinsider.com/midifiles/arcade/galaga/game-start-tune.mid';
 
 const defaultSettingsText = `{
   "worldSize": 3000, // rozmiar planszy
@@ -114,14 +116,20 @@ let creditsInterval;
 let game;
 
 window.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && game && game.running) {
-    game.running = false;
-    showMenu();
+  if (e.key === 'Escape' && game) {
+    if (!game.paused) {
+      game.paused = true;
+      showMenu();
+    } else if (!menu.classList.contains('hidden')) {
+      hideScreens();
+      game.paused = false;
+    }
   }
 });
 
 function hideScreens() {
   cancelAnimationFrame(starAnim);
+  if (menuMusic) menuMusic.pause();
   menu.classList.add('hidden');
   settingsScreen.classList.add('hidden');
   creditsScreen.classList.add('hidden');
@@ -132,12 +140,20 @@ function showMenu() {
   menu.classList.remove('hidden');
   initStarField();
   starAnim = requestAnimationFrame(renderStars);
+  if (!menuMusic) {
+    menuMusic = new Audio(midiUrl);
+    menuMusic.loop = true;
+  }
+  menuMusic.play().catch(() => {});
 }
 
 function showSettings() {
   hideScreens();
   settingsScreen.classList.remove('hidden');
-  settingsText.value = defaultSettingsText;
+  fetch('settings.json')
+    .then(r => r.text())
+    .then(t => { settingsText.value = t; })
+    .catch(() => { settingsText.value = defaultSettingsText; });
 }
 
 function showCredits() {
@@ -153,11 +169,16 @@ function hideCredits() {
   creditsScreen.style.backgroundColor = 'rgba(0,0,0,0.8)';
 }
 
-function startGame() {
+async function startGame() {
   hideCredits();
   hideScreens();
   if (audioCtx) audioCtx.resume();
-  let cfgText = settingsText.value || defaultSettingsText;
+  let cfgText = '';
+  try {
+    const resp = await fetch('settings.json');
+    if (resp.ok) cfgText = await resp.text();
+  } catch (e) {}
+  if (!cfgText) cfgText = settingsText.value || defaultSettingsText;
   let cfg;
   try {
     cfg = JSON.parse(cfgText.replace(/\/\/.*$/gm, ''));
@@ -179,7 +200,8 @@ function startGame() {
     maxEnemies: parseInt(cfg.maxEnemies) || Game.MAX_ENEMIES
   };
   game = new Game(canvas, mapCanvas, scoreEl, livesEl, armorEl, timerEl, settings);
-  game.start(showMenu);
+  game.paused = false;
+  game.start(() => { game.paused = true; showMenu(); });
 }
 
 newGameBtn.onclick = startGame;
