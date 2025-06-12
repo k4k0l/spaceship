@@ -20,6 +20,9 @@ class Game {
     this.timerEl = timerEl;
     this.enemiesEl = enemiesEl;
 
+    // TODO: refactor input handling to support touch events for mobile devices
+    // TODO: investigate networking options for future multiplayer mode
+
     this.worldWidth = settings.worldSize || Game.WORLD_SIZE;
     this.worldHeight = settings.worldSize || Game.WORLD_SIZE;
 
@@ -77,6 +80,10 @@ class Game {
       color: '#fff'
     };
     this.enterHeld = false;
+    this.rotateAnim = 0;
+    this.rotateDuration = 0.15;
+    this.rotateStart = 0;
+    this.rotateTarget = 0;
 
     window.addEventListener('keydown', e => { this.keys[e.keyCode] = true; });
     window.addEventListener('keyup', e => { this.keys[e.keyCode] = false; });
@@ -125,8 +132,16 @@ class Game {
 
   /** Update camera viewport to follow the ship */
   updateCamera() {
-    this.viewportX = Math.min(Math.max(this.ship.x - this.canvas.width / 2, 0), this.worldWidth - this.canvas.width);
-    this.viewportY = Math.min(Math.max(this.ship.y - this.canvas.height / 2, 0), this.worldHeight - this.canvas.height);
+    if (this.canvas.width >= this.worldWidth) {
+      this.viewportX = -(this.canvas.width - this.worldWidth) / 2;
+    } else {
+      this.viewportX = Math.min(Math.max(this.ship.x - this.canvas.width / 2, 0), this.worldWidth - this.canvas.width);
+    }
+    if (this.canvas.height >= this.worldHeight) {
+      this.viewportY = -(this.canvas.height - this.worldHeight) / 2;
+    } else {
+      this.viewportY = Math.min(Math.max(this.ship.y - this.canvas.height / 2, 0), this.worldHeight - this.canvas.height);
+    }
   }
 
   /** Check if world coordinates are visible on screen */
@@ -620,9 +635,20 @@ class Game {
       if (this.keys[Game.KEY_ENTER] && !this.enterHeld) {
         this.enterHeld = true;
         const sp = Math.hypot(this.ship.thrust.x, this.ship.thrust.y);
-        if (sp > 0) this.ship.angle = Math.atan2(-this.ship.thrust.y, -this.ship.thrust.x);
+        if (sp > 0) {
+          this.rotateStart = this.ship.angle;
+          this.rotateTarget = Math.atan2(-this.ship.thrust.y, -this.ship.thrust.x);
+          let diff = ((this.rotateTarget - this.rotateStart + Math.PI) % (Math.PI * 2)) - Math.PI;
+          this.rotateTarget = this.rotateStart + diff;
+          this.rotateAnim = this.rotateDuration;
+        }
       }
       if (!this.keys[Game.KEY_ENTER]) this.enterHeld = false;
+      if (this.rotateAnim > 0) {
+        this.rotateAnim -= dt;
+        const t = 1 - this.rotateAnim / this.rotateDuration;
+        this.ship.angle = this.rotateStart + (this.rotateTarget - this.rotateStart) * t;
+      }
       if (this.keys[Game.KEY_UP] || this.keys[Game.KEY_W]) {
         this.ship.thrust.x += Math.cos(this.ship.angle) * 0.07;
         this.ship.thrust.y += Math.sin(this.ship.angle) * 0.07;
