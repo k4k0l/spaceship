@@ -7,27 +7,31 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Doto:wght@100..900&display=swap');
     body { margin: 0; background: #000; color: #fff; font-family: 'Doto', sans-serif; text-align: center; }
-    #topbar { width: 100%; text-align: left; padding: 4px 10px; box-sizing: border-box; position: relative; }
-    #score { float: left; }
-    #status { float: right; }
-    #timer { position: absolute; left: 50%; transform: translateX(-50%); }
+    #wrapper { display: flex; justify-content: center; }
     #game { background: #000; display: inline-block; }
-    #minimap { background: #000; display: inline-block; margin-left: 10px; }
-    h1 { margin-bottom: 5px; }
+    #sidebar { display: flex; flex-direction: column; margin-left: 10px; align-items: flex-start; }
+    #topbar { width: 150px; text-align: left; padding: 4px 0; box-sizing: border-box; }
+    #score, #status, #timer { display: block; }
+    #minimap { background: #000; display: inline-block; margin-top: 5px; }
+    h1 { margin-bottom: 5px; font-size: 48px; }
+    button { font-family: 'Doto', sans-serif; font-size: 48px; margin: 10px; padding: 10px 20px; }
+    #footer { margin-top: 10px; font-size: 12px; color: #888; }
     .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.8); }
     .screen.hidden { display: none; }
   </style>
 </head>
 <body>
   <h1>Asteroids</h1>
-  <div id="topbar">
-    <span id="score">Score: 00000</span>
-    <span id="timer">[01:30]</span>
-    <span id="status">Lives: 05&nbsp;&nbsp;Armor: |||||</span>
-  </div>
   <div id="wrapper">
     <canvas id="game"></canvas>
-    <canvas id="minimap" width="150" height="150"></canvas>
+    <div id="sidebar">
+      <div id="topbar">
+        <span id="score">Score: 00000</span>
+        <span id="timer">[01:30]</span>
+        <span id="status">Lives: 05&nbsp;&nbsp;Armor: |||||</span>
+      </div>
+      <canvas id="minimap" width="150" height="150"></canvas>
+    </div>
   </div>
 
   <div id="menu" class="screen">
@@ -41,6 +45,8 @@
     <label>Promień statku <input id="shipSize" type="number" value="20"></label><br>
     <label>Masa statku <input id="shipMass" type="number" value="5"></label><br>
     <label>Czas rundy (s) <input id="roundTime" type="number" value="90"></label><br>
+    <label>Min. asteroid <input id="minAst" type="number" value="10"></label><br>
+    <label>Max. asteroid <input id="maxAst" type="number" value="100"></label><br>
     <button id="backBtn">Wróć</button>
   </div>
   <div id="creditsScreen" class="screen hidden">
@@ -48,6 +54,8 @@
     <p>Stworzone z pomocą OpenAI Codex</p>
     <button id="creditsBack">Wróć</button>
   </div>
+
+  <div id="footer">Wersja 0.0.2</div>
 
   <script type="module" src="main.js"></script>
 </body>
