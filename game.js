@@ -105,8 +105,9 @@ class Game {
 
   /** Resize canvas to window size */
   resizeCanvas() {
-    this.canvas.width = window.innerWidth;
-    this.canvas.height = window.innerHeight;
+    const margin = 20;
+    this.canvas.width = window.innerWidth - margin;
+    this.canvas.height = window.innerHeight - margin;
     this.mapCanvas.width = 150;
     this.mapCanvas.height = 150;
   }
@@ -348,6 +349,15 @@ class Game {
       this.rotateTarget = this.rotateStart + diff;
       this.rotateAnim = this.rotateDuration;
     }
+  }
+
+  /** Rotate ship smoothly towards specified angle */
+  rotateTo(angle) {
+    this.rotateStart = this.ship.angle;
+    this.rotateTarget = angle;
+    let diff = ((this.rotateTarget - this.rotateStart + Math.PI) % (Math.PI * 2)) - Math.PI;
+    this.rotateTarget = this.rotateStart + diff;
+    this.rotateAnim = this.rotateDuration;
   }
 
   /** Spawn lines for asteroid explosion */
