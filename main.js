@@ -16,11 +16,15 @@ const backBtn = document.getElementById('backBtn');
 const creditsBack = document.getElementById('creditsBack');
 
 const settingsText = document.getElementById('settingsText');
+const resetBtn = document.getElementById('resetBtn');
 const menuStars = document.getElementById('menuStars');
 
 let starAnim;
 let starField = [];
+let lastStarTime = 0;
 let menuMusic;
+let editor;
+let settingsData = '';
 const midiUrl = 'https://files.khinsider.com/midifiles/arcade/galaga/game-start-tune.mid';
 
 const defaultSettingsText = `{
@@ -33,7 +37,8 @@ const defaultSettingsText = `{
   "maxPlanets": 3,   // maksymalna liczba planet
   "minEnemies": 3,   // minimalna liczba przeciwników
   "maxEnemies": 10,  // maksymalna liczba przeciwników
-  "gravityMultiplier": 0.2 // współczynnik grawitacji
+  "gravityMultiplier": 0.5, // mnożnik masy obiektów
+  "planetGravityMultiplier": 20 // dodatkowy mnożnik masy planet
 }`;
 
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -86,26 +91,36 @@ function initStarField() {
   menuStars.width = window.innerWidth;
   menuStars.height = window.innerHeight;
   starField = [];
-  for (let i = 0; i < 200; i++) {
-    starField.push({
-      x: Math.random() * menuStars.width,
-      y: Math.random() * menuStars.height,
-      phase: Math.random() * Math.PI * 2
-    });
+  const layers = [0.2, 0.5, 0.8];
+  const counts = [150, 100, 70];
+  for (let i = 0; i < layers.length; i++) {
+    for (let j = 0; j < counts[i]; j++) {
+      starField.push({
+        x: Math.random() * menuStars.width,
+        y: Math.random() * menuStars.height,
+        phase: Math.random() * Math.PI * 2,
+        factor: layers[i]
+      });
+    }
   }
+  lastStarTime = performance.now();
 }
 
-function renderStars() {
+function renderStars(timestamp) {
   const ctx = menuStars.getContext('2d');
   const w = menuStars.width;
   const h = menuStars.height;
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, w, h);
-  const t = performance.now() / 1000;
+  const t = timestamp / 1000;
+  const dt = (timestamp - lastStarTime) / 1000;
+  lastStarTime = timestamp;
   ctx.fillStyle = '#fff';
   for (const s of starField) {
     const a = 0.5 + 0.5 * Math.sin(t + s.phase);
     ctx.globalAlpha = a;
+    s.x -= dt * 50 * s.factor;
+    if (s.x < 0) s.x += w;
     ctx.fillRect(s.x, s.y, 2, 2);
   }
   ctx.globalAlpha = 1;
@@ -141,19 +156,30 @@ function showMenu() {
   initStarField();
   starAnim = requestAnimationFrame(renderStars);
   if (!menuMusic) {
-    menuMusic = new Audio(midiUrl);
-    menuMusic.loop = true;
+    menuMusic = new MIDIPlayer(midiUrl);
+    menuMusic.autoReplay = true;
+    menuMusic.onload = () => menuMusic.play();
+  } else {
+    menuMusic.play();
   }
-  menuMusic.play().catch(() => {});
 }
 
 function showSettings() {
   hideScreens();
   settingsScreen.classList.remove('hidden');
-  fetch('settings.json')
-    .then(r => r.text())
-    .then(t => { settingsText.value = t; })
-    .catch(() => { settingsText.value = defaultSettingsText; });
+  if (!editor) {
+    editor = ace.edit('settingsText');
+    editor.session.setMode('ace/mode/jsonc');
+    editor.setTheme('ace/theme/monokai');
+  }
+  if (!settingsData) {
+    fetch('settings.json')
+      .then(r => r.text())
+      .then(t => { settingsData = t; editor.setValue(t, -1); })
+      .catch(() => { settingsData = defaultSettingsText; editor.setValue(settingsData, -1); });
+  } else {
+    editor.setValue(settingsData, -1);
+  }
 }
 
 function showCredits() {
@@ -178,7 +204,7 @@ async function startGame() {
     const resp = await fetch('settings.json');
     if (resp.ok) cfgText = await resp.text();
   } catch (e) {}
-  if (!cfgText) cfgText = settingsText.value || defaultSettingsText;
+  if (!cfgText) cfgText = settingsData || defaultSettingsText;
   let cfg;
   try {
     cfg = JSON.parse(cfgText.replace(/\/\/.*$/gm, ''));
@@ -187,10 +213,12 @@ async function startGame() {
     showSettings();
     return;
   }
+  settingsData = cfgText;
   Game.DEFAULT_SHIP_RADIUS = parseInt(cfg.shipSize) || Game.DEFAULT_SHIP_RADIUS;
   Game.DEFAULT_SHIP_MASS = parseInt(cfg.shipMass) || Game.DEFAULT_SHIP_MASS;
   Game.ROUND_TIME = parseInt(cfg.roundTime) || Game.ROUND_TIME;
   Game.GRAVITY_MULT = parseFloat(cfg.gravityMultiplier) || Game.GRAVITY_MULT;
+  Game.PLANET_GRAVITY_MULT = parseFloat(cfg.planetGravityMultiplier) || Game.PLANET_GRAVITY_MULT;
   const settings = {
     worldSize: parseInt(cfg.worldSize) || Game.WORLD_SIZE,
     minAsteroids: parseInt(cfg.minAsteroids) || Game.MIN_INITIAL_ASTEROIDS,
@@ -207,7 +235,8 @@ async function startGame() {
 newGameBtn.onclick = startGame;
 settingsBtn.onclick = showSettings;
 creditsBtn.onclick = showCredits;
-backBtn.onclick = showMenu;
+backBtn.onclick = () => { settingsData = editor.getValue(); showMenu(); };
+resetBtn.onclick = () => { settingsData = defaultSettingsText; editor.setValue(defaultSettingsText, -1); };
 creditsBack.onclick = () => { hideCredits(); showMenu(); };
 
 showMenu();
