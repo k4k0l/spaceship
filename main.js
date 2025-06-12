@@ -35,7 +35,7 @@ let lastStarTime = 0;
 let menuMusic;
 let editor;
 let settingsData = '';
-const midiUrl = 'https://files.khinsider.com/midifiles/arcade/galaga/game-start-tune.mid';
+const midiUrl = 'data:audio/midi;base64,TVRoZAAAAAYAAQAGAYBNVHJrAAAAGgD/WAQEAmAIAP9/AwAAQQD/UQMJiWgA/y8ATVRyawAAANoA/wMAALEAAADBUACxCj8A/1kCAAAAsQd/AJFDZIIggUMAAJFFZIFAgUUAAJFIZGCBSAAAkUdkgiCBRwAAkUNkgiCBQwAAkUhkgiCBSAAAkUpkgUCBSgAAkU1kYIFNAACRTGSCIIFMAACRSmSCIIFKAACRS2SCIIFLAACRSmSBQIFKAACRSGRggUgAAJFGZIIggUYAAJFLZIIggUsAAJFSZIIggVIAAJFPZIFAgU8AAJFLZGCBSwAAkUpkgiCBSgAAkU9kgUCBTwAAkUxkYLEHAIMAgUwAAP8vAE1UcmsAAAFAAP8DAACyAAAAwlAAsgo/AP9ZAgAAALIHfwCSTGSBQIJMAACSQ2RggkMAAJJKZIFAgkoAAJJFZGCCRQAAkkhkgUCCSAAAkkNkYIJDAACSRWSBQIJFAACSSGRggkgAAJJMZIFAgkwAAJJDZGCCQwAAkkpkgUCCSgAAkkVkYIJFAACSSGSBQIJIAACSQ2RggkMAAJJIZIFAgkgAAJJPZGCCTwAAklBkgUCCUAAAkk9kYIJPAACSTWSBQIJNAACSS2RggksAAJJKZIFAgkoAAJJIZGCCSAAAkkZkgUCCRgAAkkpkYIJKAACSS2SBQIJLAACSTWRggk0AAJJLZIFAgksAAJJIZGCCSAAAkk1kYIJNAACSSmRggkoAAJJFZGCCRQAAkkpkYIJKAACSR2RggkcAAJJFZGCyBwCDAIJFAAD/LwBNVHJrAAABQAD/AwAAswAAAMNQALMKPwD/WQIAAACzB38Ak0NkgUCDQwAAk0hkYINIAACTSmSBQINKAACTTWRgg00AAJNMZIFAg0wAAJNIZGCDSAAAk0pkgUCDSgAAk1FkYINRAACTT2SBQINPAACTSGRgg0gAAJNKZIFAg0oAAJNNZGCDTQAAk0xkgUCDTAAAk0hkYINIAACTT2SBQINPAACTU2Rgg1MAAJNUZIFAg1QAAJNSZGCDUgAAk1BkgUCDUAAAk09kYINPAACTTWSBQINNAACTS2Rgg0sAAJNKZIFAg0oAAJNGZGCDRgAAk1JkgUCDUgAAk1RkYINUAACTUmSBQINSAACTT2Rgg08AAJNRZGCDUQAAk01kYINNAACTSmRgg0oAAJNPZGCDTwAAk0xkYINMAACTSmRgswcAgwCDSgAA/y8ATVRyawAAABIA/wMAALQKPwD/WQIAAAD/LwBNVHJrAAAADgD/AwAA/1kCAAAA/y8A';
 
 const defaultSettingsText = `{
   "worldSize": 3000, // rozmiar planszy
@@ -50,6 +50,17 @@ const defaultSettingsText = `{
   "gravityMultiplier": 0.5, // mnożnik masy obiektów
   "planetGravityMultiplier": 20 // dodatkowy mnożnik masy planet
 }`;
+
+function parseJSONC(text) {
+  return JSON.parse(text.replace(/\/\/.*$/gm, ''));
+}
+
+function generateSettingsText(values) {
+  return defaultSettingsText.replace(/"(\w+)":\s*([^,]+)(,?)/g, (m, key, val, comma) => {
+    const v = values && values[key] !== undefined ? values[key] : val.trim();
+    return `"${key}": ${v}${comma}`;
+  });
+}
 
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
@@ -180,13 +191,18 @@ function showSettings() {
   settingsScreen.classList.remove('hidden');
   if (!editor) {
     editor = ace.edit('settingsText');
-    editor.session.setMode('ace/mode/jsonc');
+    editor.session.setMode('ace/mode/json5');
     editor.setTheme('ace/theme/monokai');
   }
   if (!settingsData) {
     fetch('settings.json')
       .then(r => r.text())
-      .then(t => { settingsData = t; editor.setValue(t, -1); })
+      .then(t => {
+        let obj;
+        try { obj = JSON.parse(t); } catch (e) { obj = null; }
+        settingsData = generateSettingsText(obj);
+        editor.setValue(settingsData, -1);
+      })
       .catch(() => { settingsData = defaultSettingsText; editor.setValue(settingsData, -1); });
   } else {
     editor.setValue(settingsData, -1);
@@ -218,13 +234,13 @@ async function startGame() {
   if (!cfgText) cfgText = settingsData || defaultSettingsText;
   let cfg;
   try {
-    cfg = JSON.parse(cfgText.replace(/\/\/.*$/gm, ''));
+    cfg = parseJSONC(cfgText);
   } catch (e) {
     alert('B\u0142\u0119dny format ustawie\u0144!');
     showSettings();
     return;
   }
-  settingsData = cfgText;
+  settingsData = generateSettingsText(cfg);
   Game.DEFAULT_SHIP_RADIUS = parseInt(cfg.shipSize) || Game.DEFAULT_SHIP_RADIUS;
   Game.DEFAULT_SHIP_MASS = parseInt(cfg.shipMass) || Game.DEFAULT_SHIP_MASS;
   Game.ROUND_TIME = parseInt(cfg.roundTime) || Game.ROUND_TIME;

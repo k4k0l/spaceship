@@ -80,7 +80,6 @@ class Game {
     window.addEventListener('resize', () => this.resizeCanvas());
     this.resizeCanvas();
     this.createStars();
-    this.updateTopbar();
     this.updateTimer();
     this.minAsteroids = settings.minAsteroids || Game.MIN_INITIAL_ASTEROIDS;
     this.maxAsteroids = settings.maxAsteroids || Game.MAX_INITIAL_ASTEROIDS;
