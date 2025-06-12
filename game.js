@@ -21,6 +21,7 @@ const ship = {
   y: canvas.height / 2,
   angle: 0,
   radius: 20,
+  mass: 5,
   thrust: {
     x: Math.cos(startAngle) * 0.5,
     y: Math.sin(startAngle) * 0.5
@@ -39,8 +40,11 @@ let restartTimer = 0;
 let respawnTimer = 0;
 let spawnInvul = 0;
 let flashTimer = 0;
+let lineFlashTimer = 0;
 let particles = [];
 let asteroidLines = [];
+let pickups = [];
+let pickupTimer = 10 + Math.random()*20;
 let lives = 5;
 let armor = 5;
 let score = 0;
@@ -59,11 +63,11 @@ function addScore(hp){
   updateTopbar();
 }
 
-function spawnParticles(x,y,count,color){
+function spawnParticles(x,y,count,color,life=1){
   for(let i=0;i<count;i++){
     const ang = Math.random()*Math.PI*2;
     const spd = Math.random()*1+0.5;
-    particles.push({x,y,dx:Math.cos(ang)*spd,dy:Math.sin(ang)*spd,life:1,color});
+    particles.push({x,y,dx:Math.cos(ang)*spd,dy:Math.sin(ang)*spd,life,color});
   }
 }
 
@@ -96,7 +100,7 @@ function spawnAsteroid() {
   const speed = Math.random() * 0.5 + 0.2;
   const dx = Math.cos(angle) * speed;
   const dy = Math.sin(angle) * speed;
-  const radius = Math.random() * 30 + 20;
+  const radius = Math.random() * 40 + 30;
   const points = [];
   const count = Math.floor(Math.random() * 5) + 5;
   for (let i = 0; i < count; i++) {
@@ -110,10 +114,22 @@ function spawnAsteroid() {
   asteroids.push({ x, y, dx, dy, radius, points, color, hp, mass });
 }
 
+function spawnPickup(){
+  const size = ship.radius;
+  const x = Math.random() * canvas.width;
+  const y = Math.random() * canvas.height;
+  const ang = Math.random() * Math.PI * 2;
+  const spd = Math.random() * 0.3 + 0.1;
+  const dx = Math.cos(ang)*spd;
+  const dy = Math.sin(ang)*spd;
+  pickups.push({x,y,dx,dy,size,hp:15,letter:'S'});
+}
+
 function breakAsteroid(a, impactAngle) {
-  const count = Math.max(2, Math.floor(a.radius / 15));
+  const count = Math.max(1, Math.floor(a.radius / 20));
   for (let i = 0; i < count; i++) {
-    const angle = impactAngle + Math.PI + (Math.random() - 0.5) * Math.PI / 2;
+    const angle = count===1 ? impactAngle + Math.PI :
+      impactAngle + Math.PI + (Math.random() - 0.5) * Math.PI / 2;
     const speed = Math.random() * 0.5 + 0.2;
     const dx = Math.cos(angle) * speed;
     const dy = Math.sin(angle) * speed;
@@ -128,7 +144,7 @@ function breakAsteroid(a, impactAngle) {
     const color = palette[Math.floor(Math.random() * palette.length)];
     const hp = Math.max(1, a.hp - 1);
     const mass = radius * 0.5;
-    if(radius > 12){
+    if(radius > 8){
       asteroids.push({ x: a.x, y: a.y, dx, dy, radius, points: pts, color, hp, mass });
     }
   }
@@ -137,6 +153,7 @@ function breakAsteroid(a, impactAngle) {
 function explodeShip() {
   ship.dead = true;
   shipFragments = [];
+  flashTimer = 1;
   const pts = [
     { x: ship.radius, y: 0 },
     { x: -ship.radius, y: ship.radius / 2 },
@@ -250,6 +267,7 @@ function update(dt){
 
   spawnInvul = Math.max(0, spawnInvul - dt);
   flashTimer = Math.max(0, flashTimer - dt);
+  lineFlashTimer = Math.max(0, lineFlashTimer - dt);
 
   bullets.forEach((b,bi)=>{
     b.x = (b.x + b.dx + canvas.width) % canvas.width;
@@ -258,7 +276,7 @@ function update(dt){
     if(!ship.dead && spawnInvul<=0 && Math.hypot(b.x-ship.x,b.y-ship.y)<ship.radius){
       bullets.splice(bi,1);
       spawnParticles(b.x,b.y,5,'#f00');
-      armor-=1; flashTimer=1; updateTopbar();
+      armor-=1; lineFlashTimer=1.5; updateTopbar();
       if(armor<=0) explodeShip();
     }
   });
@@ -324,12 +342,12 @@ function update(dt){
     if(!ship.dead && Math.hypot(ship.x-a.x, ship.y-a.y) < ship.radius + a.radius){
       const ang = Math.atan2(a.y - ship.y, a.x - ship.x);
       const force = 0.5;
-      ship.thrust.x -= Math.cos(ang)*force*a.mass/5;
-      ship.thrust.y -= Math.sin(ang)*force*a.mass/5;
-      a.dx += Math.cos(ang)*force*5/a.mass;
-      a.dy += Math.sin(ang)*force*5/a.mass;
+      ship.thrust.x -= Math.cos(ang)*force*a.mass/ship.mass;
+      ship.thrust.y -= Math.sin(ang)*force*a.mass/ship.mass;
+      a.dx += Math.cos(ang)*force*ship.mass/a.mass;
+      a.dy += Math.sin(ang)*force*ship.mass/a.mass;
       if(spawnInvul<=0){
-        armor-=1; flashTimer=1; updateTopbar();
+        armor-=1; lineFlashTimer=1.5; updateTopbar();
         spawnParticles(ship.x+Math.cos(ang)*ship.radius, ship.y+Math.sin(ang)*ship.radius,10,'#f00');
         a.hp -=1;
         if(armor<=0) explodeShip();
@@ -346,6 +364,52 @@ function update(dt){
   particles = particles.filter(p=>p.life>0);
   asteroidLines.forEach(l=>{l.x+=l.dx;l.y+=l.dy;l.life-=dt;});
   asteroidLines = asteroidLines.filter(l=>l.life>0);
+
+  pickupTimer -= dt;
+  if(pickupTimer<=0){
+    spawnPickup();
+    pickupTimer = 10 + Math.random()*20;
+  }
+
+  pickups.forEach((p,pi)=>{
+    p.x = (p.x + p.dx + canvas.width) % canvas.width;
+    p.y = (p.y + p.dy + canvas.height) % canvas.height;
+
+    asteroids.forEach((a,ai)=>{
+      if(Math.hypot(p.x-a.x,p.y-a.y) < p.size + a.radius){
+        spawnParticles((p.x+a.x)/2,(p.y+a.y)/2,5,'#ff0');
+        p.hp -= 1;
+        a.hp -= 0.5;
+        if(a.hp<=0){
+          asteroids.splice(ai,1);
+          explodeAsteroid(a);
+          breakAsteroid(a, Math.atan2(a.y-p.y,a.x-p.x));
+        }
+      }
+    });
+
+    bullets.forEach((b,bi)=>{
+      if(Math.hypot(b.x-p.x,b.y-p.y)<p.size){
+        bullets.splice(bi,1);
+        spawnParticles(p.x,p.y,50,'#ff0',2);
+        pickups.splice(pi,1);
+        if(Math.random()<0.5) ship.radius*=2; else ship.radius/=2;
+        ship.mass*=0.5;
+        score+=20; if(score>99999) score=99999; updateTopbar();
+      }
+    });
+
+    if(!ship.dead && Math.hypot(p.x-ship.x,p.y-ship.y)<p.size+ship.radius){
+      spawnParticles(p.x,p.y,50,'#ff0',2);
+      pickups.splice(pi,1);
+      if(Math.random()<0.5) ship.radius*=2; else ship.radius/=2;
+      ship.mass*=0.5;
+      score+=20; if(score>99999) score=99999; updateTopbar();
+    } else if(p.hp<=0){
+      spawnParticles(p.x,p.y,30,'#ff0',2);
+      pickups.splice(pi,1);
+    }
+  });
 }
 
 function drawWrapped(x,y,r,fn){
@@ -382,7 +446,7 @@ function draw(){
     ctx.restore();
   });
 
-  ctx.strokeStyle = '#fff';
+  ctx.strokeStyle = lineFlashTimer>0 ? (Math.floor(lineFlashTimer*5)%2===0 ? '#fff' : '#f00') : '#fff';
   if(!ship.dead){
     if(spawnInvul<=0 || Math.floor(spawnInvul*10)%2===0){
       drawWrapped(ship.x, ship.y, ship.radius, ()=>{
@@ -432,6 +496,20 @@ function draw(){
     });
   });
 
+  pickups.forEach(p=>{
+    ctx.save();
+    ctx.fillStyle='#ff0';
+    drawWrapped(p.x,p.y,p.size,()=>{
+      ctx.fillRect(p.x-p.size/2,p.y-p.size/2,p.size,p.size);
+      ctx.fillStyle='#000';
+      ctx.font=p.size+'px sans-serif';
+      ctx.textAlign='center';
+      ctx.textBaseline='middle';
+      ctx.fillText('S',p.x,p.y+1);
+    });
+    ctx.restore();
+  });
+
   if(gameOver){
     ctx.fillStyle = 'white';
     ctx.font = '48px sans-serif';
@@ -441,7 +519,7 @@ function draw(){
     ctx.fillText('Restarting in ' + Math.ceil(restartTimer), canvas.width/2, canvas.height/2 + 40);
   }
 
-  if(flashTimer>0 && Math.floor(flashTimer*20)%2===0){
+  if(flashTimer>0 && Math.floor(flashTimer*6)%2===0){
     ctx.save();
     ctx.globalCompositeOperation = 'difference';
     ctx.fillStyle = '#fff';
