@@ -98,8 +98,8 @@ class Game {
 
   /** Resize canvas to window size */
   resizeCanvas() {
-    this.canvas.width = Math.max(window.innerWidth * 0.5, 800);
-    this.canvas.height = Math.max(window.innerHeight * 0.5, 600);
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
     this.mapCanvas.width = 150;
     this.mapCanvas.height = 150;
   }
