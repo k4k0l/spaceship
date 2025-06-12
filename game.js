@@ -33,6 +33,8 @@ class Game {
     this.exhaust = [];
     this.stars = [[], [], []];
     this.planets = [];
+    // ensure enemies array exists before any spawns
+    this.enemies = [];
 
     this.paused = false;
 
@@ -88,7 +90,6 @@ class Game {
     this.maxEnemies = settings.maxEnemies || Game.MAX_ENEMIES;
     this.spawnInitialAsteroids(Math.floor(Math.random() * (this.maxAsteroids - this.minAsteroids + 1)) + this.minAsteroids);
     this.spawnPlanets(this.maxPlanets);
-    this.enemies = [];
     const enemyCount = Math.floor(Math.random() * (this.maxEnemies - this.minEnemies + 1)) + this.minEnemies;
     for (let i = 0; i < enemyCount; i++) this.spawnEnemy();
     this.updateTopbar();
@@ -117,7 +118,8 @@ class Game {
       else armorHtml += '<span style="color:#888">.</span>';
     }
     this.armorEl.innerHTML = armorHtml;
-    this.enemiesEl.innerHTML = 'Enemies: <span style="color:#f0f">' + this.enemies.length + '</span>';
+    const enemyCount = Array.isArray(this.enemies) ? this.enemies.length : 0;
+    this.enemiesEl.innerHTML = 'Enemies: <span style="color:#f0f">' + enemyCount + '</span>';
   }
 
   /** Update camera viewport to follow the ship */
