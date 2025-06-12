@@ -84,7 +84,18 @@ function explodeAsteroid(a){
     const p1=a.points[i];
     const p2=a.points[(i+1)%a.points.length];
     const ang=Math.atan2((p1.y+p2.y)/2,(p1.x+p2.x)/2);
-    asteroidLines.push({x:a.x,y:a.y,x1:p1.x,y1:p1.y,x2:p2.x,y2:p2.y,dx:Math.cos(ang),dy:Math.sin(ang),life:1,color:a.color});
+    asteroidLines.push({
+      x:a.x,
+      y:a.y,
+      x1:p1.x,
+      y1:p1.y,
+      x2:p2.x,
+      y2:p2.y,
+      dx:Math.cos(ang),
+      dy:Math.sin(ang),
+      life:1,
+      color:a.color
+    });
   }
 }
 
@@ -133,15 +144,18 @@ function spawnPickup(){
   pickups.push({x,y,dx,dy,size,hp:15,letter:'S',ttl:15});
 }
 
+const MIN_ASTEROID_RADIUS = 15;
+
 function breakAsteroid(a, impactAngle) {
-  const pieces = Math.max(2, Math.floor(a.radius / 20));
+  const pieces = Math.floor(a.radius / MIN_ASTEROID_RADIUS);
+  if(pieces < 2) return;
+  const radius = Math.sqrt((a.radius * a.radius) / pieces);
+  if(radius < MIN_ASTEROID_RADIUS) return;
   for (let i = 0; i < pieces; i++) {
-    const angle = impactAngle + Math.PI + (i/pieces)*Math.PI*2 + (Math.random()-0.5)*Math.PI/pieces;
+    const angle = impactAngle + Math.PI + (i / pieces) * Math.PI * 2;
     const speed = Math.random() * 0.5 + 0.2;
     const dx = Math.cos(angle) * speed;
     const dy = Math.sin(angle) * speed;
-    const radius = a.radius / pieces * (0.8 + Math.random()*0.4);
-    if(radius <= 8) continue;
     const pts = [];
     const pc = Math.floor(Math.random() * 5) + 5;
     for (let j = 0; j < pc; j++) {
@@ -485,7 +499,16 @@ function draw(){
   asteroidLines.forEach(l=>{
     ctx.save();
     ctx.globalAlpha = l.life;
-    drawWrapped(l.x,l.y,0,()=>{ctx.beginPath();ctx.moveTo(l.x1,l.y1);ctx.lineTo(l.x2,l.y2);ctx.strokeStyle=l.color;ctx.stroke();});
+    drawWrapped(l.x,l.y,0,()=>{
+      ctx.save();
+      ctx.translate(l.x, l.y);
+      ctx.beginPath();
+      ctx.moveTo(l.x1, l.y1);
+      ctx.lineTo(l.x2, l.y2);
+      ctx.strokeStyle = l.color;
+      ctx.stroke();
+      ctx.restore();
+    });
     ctx.restore();
   });
 
