@@ -1030,7 +1030,7 @@ Game.MAX_INITIAL_ASTEROIDS = 100;
 Game.MAX_ASTEROIDS = 100;
 Game.MAX_SPEED = 6;
 Game.BULLET_MASS = 0.5;
-Game.GRAVITY = 5;
+Game.GRAVITY = 3;
 Game.MAX_PLANETS = 3;
 Game.PALETTE = ['#fff', '#0ff', '#f0f', '#ff0', '#0f0', '#f00', '#00f', '#f80'];
 
