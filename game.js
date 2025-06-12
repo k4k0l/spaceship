@@ -39,8 +39,9 @@ class Game {
     this.spawnInvul = 0;
     this.flashTimer = 0;
     this.lineFlashTimer = 0;
-    this.pickupTimer = 10 + Math.random() * 20;
-    this.healPickupTimer = 60 + Math.random() * 30;
+    this.pickupTimer = 5 + Math.random() * 10;
+    this.healPickupTimer = 30 + Math.random() * 15;
+    this.timePickupTimer = 45 + Math.random() * 30;
     this.lives = 5;
     this.armor = 5;
     this.score = 0;
@@ -68,6 +69,8 @@ class Game {
       dead: false,
       color: '#fff'
     };
+    this.enterHeld = false;
+    this.flipRemaining = 0;
 
     window.addEventListener('keydown', e => { this.keys[e.keyCode] = true; });
     window.addEventListener('keyup', e => { this.keys[e.keyCode] = false; });
@@ -94,8 +97,9 @@ class Game {
   /** Update score/lives display */
   updateTopbar() {
     this.scoreEl.textContent = 'Score: ' + String(Math.floor(this.score)).padStart(5, '0');
-    this.livesEl.style.color = '#f00';
-    this.livesEl.textContent = 'Lives: ' + String(this.lives).padStart(2, '0');
+    this.livesEl.style.color = '#fff';
+    this.livesEl.innerHTML = 'Lives: <span style="color:#f00">' +
+      String(this.lives).padStart(2, '0') + '</span>';
     let armorHtml = 'Armor: ';
     for (let i = 0; i < 5; i++) {
       if (i < this.armor) armorHtml += '<span style="color:#0f0">|</span>';
@@ -122,7 +126,7 @@ class Game {
   updateTimer() {
     const m = Math.floor(this.timer / 60);
     const s = Math.floor(this.timer % 60);
-    this.timerEl.textContent = `[${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}]`;
+    this.timerEl.textContent = `Timer: [${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}]`;
   }
 
   /** Add score based on asteroid hp */
@@ -131,6 +135,10 @@ class Game {
     if (this.score > 99999) this.score = 99999;
     this.updateTopbar();
     this.updateTimer();
+  }
+
+  static gravityRange(mass) {
+    return mass * Game.GRAVITY_RANGE_FACTOR;
   }
 
   /** Generate star background */
@@ -164,7 +172,7 @@ class Game {
 
   spawnPlanet() {
     const radius = Math.random() * 60 + 40;
-    const mass = radius * 3;
+    const mass = radius * 50;
     const x = Math.random() * this.worldWidth;
     const y = Math.random() * this.worldHeight;
     const color = Game.PALETTE[Math.floor(Math.random() * Game.PALETTE.length)];
@@ -222,6 +230,18 @@ class Game {
     const dx = Math.cos(ang) * spd;
     const dy = Math.sin(ang) * spd;
     this.pickups.push({ x, y, dx, dy, size, hp: 15, letter: 'H', color: '#f00', ttl: 15 });
+  }
+
+  /** Spawn time bonus pickup */
+  spawnTimePickup() {
+    const size = Game.PICKUP_SIZE;
+    const x = Math.random() * this.worldWidth;
+    const y = Math.random() * this.worldHeight;
+    const ang = Math.random() * Math.PI * 2;
+    const spd = Math.random() * 0.3 + 0.1;
+    const dx = Math.cos(ang) * spd;
+    const dy = Math.sin(ang) * spd;
+    this.pickups.push({ x, y, dx, dy, size, hp: 15, letter: 'T', color: '#00f', ttl: 15 });
   }
 
   /** Break asteroid into pieces */
@@ -455,7 +475,7 @@ class Game {
     const viewY = this.viewportY / this.worldHeight * mh;
     mctx.strokeStyle = '#fff';
     mctx.strokeRect(viewX, viewY, viewW, viewH);
-    mctx.fillStyle = '#fff';
+    mctx.fillStyle = '#888';
     this.asteroids.forEach(a => {
       const x = (a.x / this.worldWidth) * mw;
       const y = (a.y / this.worldHeight) * mh;
@@ -470,7 +490,7 @@ class Game {
     this.planets.forEach(p => {
       const x = (p.x / this.worldWidth) * mw;
       const y = (p.y / this.worldHeight) * mh;
-      mctx.fillStyle = p.color;
+      mctx.fillStyle = '#888';
       mctx.beginPath();
       mctx.arc(x, y, 3, 0, Math.PI * 2);
       mctx.fill();
@@ -489,7 +509,8 @@ class Game {
         const dx = pl.x - tx;
         const dy = pl.y - ty;
         const distSq = dx * dx + dy * dy;
-        if (distSq > 1) {
+        const range = Game.gravityRange(pl.mass);
+        if (distSq > 1 && distSq < range * range) {
           const dist = Math.sqrt(distSq);
           const a = Game.GRAVITY * pl.mass / distSq;
           vx += (dx / dist) * a;
@@ -507,7 +528,7 @@ class Game {
     // ship
     const sx = (this.ship.x / this.worldWidth) * mw;
     const sy = (this.ship.y / this.worldHeight) * mh;
-    mctx.fillStyle = '#f0f';
+    mctx.fillStyle = '#fff';
     mctx.fillRect(sx - 2, sy - 2, 4, 4);
   }
 
@@ -547,6 +568,20 @@ class Game {
     } else {
       if (this.keys[Game.KEY_LEFT]) this.ship.angle -= 3 * dt;
       if (this.keys[Game.KEY_RIGHT]) this.ship.angle += 3 * dt;
+
+      if (this.keys[Game.KEY_ENTER]) {
+        if (!this.enterHeld && this.flipRemaining <= 0) {
+          this.enterHeld = true;
+          this.flipRemaining = 0.3;
+        }
+      } else {
+        this.enterHeld = false;
+      }
+      if (this.flipRemaining > 0) {
+        const step = Math.min(this.flipRemaining, dt);
+        this.ship.angle += Math.PI * (step / 0.3);
+        this.flipRemaining -= step;
+      }
       if (this.keys[Game.KEY_UP]) {
         this.ship.thrust.x += Math.cos(this.ship.angle) * 0.1;
         this.ship.thrust.y += Math.sin(this.ship.angle) * 0.1;
@@ -577,7 +612,8 @@ class Game {
         const dx = p.x - this.ship.x;
         const dy = p.y - this.ship.y;
         const distSq = dx * dx + dy * dy;
-        if (distSq > 1) {
+        const range = Game.gravityRange(p.mass);
+        if (distSq > 1 && distSq < range * range) {
           const dist = Math.sqrt(distSq);
           const a = Game.GRAVITY * p.mass / distSq;
           this.ship.thrust.x += (dx / dist) * a * dt;
@@ -588,7 +624,8 @@ class Game {
         const dx = a.x - this.ship.x;
         const dy = a.y - this.ship.y;
         const distSq = dx * dx + dy * dy;
-        if (distSq > 1) {
+        const range = Game.gravityRange(a.mass);
+        if (distSq > 1 && distSq < range * range) {
           const dist = Math.sqrt(distSq);
           const accelShip = Game.GRAVITY * a.mass / distSq;
           const accelAst = Game.GRAVITY * this.ship.mass / distSq;
@@ -634,7 +671,8 @@ class Game {
         const dx = p.x - b.x;
         const dy = p.y - b.y;
         const distSq = dx * dx + dy * dy;
-        if (distSq > 1) {
+        const range = Game.gravityRange(p.mass);
+        if (distSq > 1 && distSq < range * range) {
           const dist = Math.sqrt(distSq);
           const a = Game.GRAVITY * p.mass / distSq;
           b.dx += (dx / dist) * a * dt;
@@ -659,7 +697,8 @@ class Game {
         const dx = p.x - a.x;
         const dy = p.y - a.y;
         const distSq = dx * dx + dy * dy;
-        if (distSq > 1) {
+        const range = Game.gravityRange(p.mass);
+        if (distSq > 1 && distSq < range * range) {
           const dist = Math.sqrt(distSq);
           const accel = Game.GRAVITY * p.mass / distSq;
           a.dx += (dx / dist) * accel * dt;
@@ -697,7 +736,9 @@ class Game {
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const distSq = dx * dx + dy * dy;
-        if (distSq > 1) {
+        const rangeA = Game.gravityRange(a.mass);
+        const rangeB = Game.gravityRange(b.mass);
+        if (distSq > 1 && (distSq < rangeA * rangeA || distSq < rangeB * rangeB)) {
           const dist = Math.sqrt(distSq);
           const accelA = Game.GRAVITY * b.mass / distSq;
           const accelB = Game.GRAVITY * a.mass / distSq;
@@ -807,13 +848,19 @@ class Game {
     this.pickupTimer -= dt;
     if (this.pickupTimer <= 0) {
       this.spawnPickup();
-      this.pickupTimer = 10 + Math.random() * 20;
+      this.pickupTimer = 5 + Math.random() * 10;
     }
 
     this.healPickupTimer -= dt;
     if (this.healPickupTimer <= 0) {
       this.spawnHealPickup();
-      this.healPickupTimer = 60 + Math.random() * 30;
+      this.healPickupTimer = 30 + Math.random() * 15;
+    }
+
+    this.timePickupTimer -= dt;
+    if (this.timePickupTimer <= 0) {
+      this.spawnTimePickup();
+      this.timePickupTimer = 45 + Math.random() * 30;
     }
 
     this.pickups.forEach((p, pi) => {
@@ -821,7 +868,8 @@ class Game {
         const dx = pl.x - p.x;
         const dy = pl.y - p.y;
         const distSq = dx * dx + dy * dy;
-        if (distSq > 1) {
+        const range = Game.gravityRange(pl.mass);
+        if (distSq > 1 && distSq < range * range) {
           const dist = Math.sqrt(distSq);
           const a = Game.GRAVITY * pl.mass / distSq;
           p.dx += (dx / dist) * a * dt;
@@ -859,6 +907,9 @@ class Game {
             this.score += 20; if (this.score > 99999) this.score = 99999; this.updateTopbar();
           } else if (p.letter === 'H') {
             this.lives = 5; this.armor = 5; this.updateTopbar();
+          } else if (p.letter === 'T') {
+            this.timer += 30;
+            this.updateTimer();
           }
         }
       });
@@ -870,6 +921,9 @@ class Game {
           this.score += 20; if (this.score > 99999) this.score = 99999; this.updateTopbar();
         } else if (p.letter === 'H') {
           this.lives = 5; this.armor = 5; this.updateTopbar();
+        } else if (p.letter === 'T') {
+          this.timer += 30;
+          this.updateTimer();
         }
       } else if (p.hp <= 0) {
         this.spawnParticles(p.x, p.y, 30, p.color, 2);
@@ -1049,6 +1103,7 @@ Game.KEY_UP = 38;
 Game.KEY_RIGHT = 39;
 Game.KEY_DOWN = 40;
 Game.KEY_SPACE = 32;
+Game.KEY_ENTER = 13;
 Game.DEFAULT_SHIP_RADIUS = 20;
 Game.DEFAULT_SHIP_MASS = 5;
 Game.BULLET_LIFE = 3;
@@ -1064,6 +1119,7 @@ Game.MAX_ASTEROIDS = 100;
 Game.MAX_SPEED = 6;
 Game.BULLET_MASS = 0.5;
 Game.GRAVITY = 3;
+Game.GRAVITY_RANGE_FACTOR = 5;
 Game.MAX_PLANETS = 3;
 Game.PALETTE = ['#fff', '#0ff', '#f0f', '#ff0', '#0f0', '#f00', '#00f', '#f80'];
 
