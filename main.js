@@ -1,6 +1,6 @@
 
 const GAME_NAME = 'Asteroids';
-const GAME_VERSION = '0.0.9';
+const GAME_VERSION = '0.0.10';
 
 const canvas = document.getElementById('game');
 const mapCanvas = document.getElementById('minimap');
@@ -192,9 +192,18 @@ if (isMobile) {
   let longPress = false;
   let lpTimer = null;
   let dx = 0, dy = 0;
-  const radius = 40;
+  const joystickRadius = 40;
+  const stickRadius = 20;
+  let maxRadius = 0;
   let lastTapX = 0, lastTapY = 0;
   let returnAnim = null;
+
+  function updateMaxRadius() {
+    maxRadius = Math.min(window.innerWidth, window.innerHeight) / 2 - stickRadius;
+  }
+
+  window.addEventListener('resize', updateMaxRadius);
+  updateMaxRadius();
 
   function updateKeys() {
     if (!game) return;
@@ -214,9 +223,14 @@ if (isMobile) {
 
   function updateIndicator() {
     if (touchId !== null || !game) return;
-    const scale = 10;
-    const vx = game.ship.thrust.x * scale;
-    const vy = game.ship.thrust.y * scale;
+    const scale = maxRadius / Game.MAX_SPEED;
+    let vx = game.ship.thrust.x * scale;
+    let vy = game.ship.thrust.y * scale;
+    const dist = Math.hypot(vx, vy);
+    if (dist > maxRadius) {
+      vx = (vx / dist) * maxRadius;
+      vy = (vy / dist) * maxRadius;
+    }
     stick.style.transform = `translate(${vx}px,${vy}px)`;
   }
   function startReturn() {
@@ -255,8 +269,13 @@ if (isMobile) {
     if (touchId === null) return;
     for (const t of e.touches) {
       if (t.identifier === touchId) {
-        dx = t.clientX - (joystick.offsetLeft + radius);
-        dy = t.clientY - (joystick.offsetTop + radius);
+        dx = t.clientX - (joystick.offsetLeft + joystickRadius);
+        dy = t.clientY - (joystick.offsetTop + joystickRadius);
+        const dist = Math.hypot(dx, dy);
+        if (dist > maxRadius) {
+          dx = (dx / dist) * maxRadius;
+          dy = (dy / dist) * maxRadius;
+        }
         stick.style.transform = `translate(${dx}px,${dy}px)`;
         updateKeys();
         break;
@@ -271,9 +290,13 @@ if (isMobile) {
         const rect = canvas.getBoundingClientRect();
         const wx = game.viewportX + (lastTapX - rect.left);
         const wy = game.viewportY + (lastTapY - rect.top);
-        game.ship.angle = Math.atan2(wy - game.ship.y, wx - game.ship.x);
-        game.keys[Game.KEY_SPACE] = true;
-        setTimeout(() => { if (game) game.keys[Game.KEY_SPACE] = false; }, 100);
+        const angle = Math.atan2(wy - game.ship.y, wx - game.ship.x);
+        game.rotateTo(angle);
+        setTimeout(() => {
+          if (!game) return;
+          game.keys[Game.KEY_SPACE] = true;
+          setTimeout(() => { if (game) game.keys[Game.KEY_SPACE] = false; }, 100);
+        }, game.rotateDuration * 1000);
       }
     } else {
       resetKeys();
