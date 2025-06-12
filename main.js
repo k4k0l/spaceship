@@ -26,8 +26,6 @@ const aboutBack = document.getElementById('aboutBack');
 const creditsBack = document.getElementById('creditsBack');
 
 const mobileControls = document.getElementById('mobileControls');
-const mobileAccel = document.getElementById('mobileAccel');
-const mobileShoot = document.getElementById('mobileShoot');
 const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
 const settingsText = document.getElementById('settingsText');
@@ -188,21 +186,86 @@ let creditsInterval;
 let game;
 
 if (isMobile) {
-  window.addEventListener('deviceorientation', e => {
-    if (!game || game.paused) return;
-    if (e.gamma == null) return;
-    game.keys[Game.KEY_LEFT] = e.gamma < -10;
-    game.keys[Game.KEY_RIGHT] = e.gamma > 10;
+  const joystick = document.getElementById('joystick');
+  const stick = document.getElementById('stick');
+  let touchId = null;
+  let longPress = false;
+  let lpTimer = null;
+  let dx = 0, dy = 0;
+  const radius = 40;
+
+  function updateKeys() {
+    if (!game) return;
+    const thr = 10;
+    game.keys[Game.KEY_LEFT] = dx < -thr;
+    game.keys[Game.KEY_RIGHT] = dx > thr;
+    game.keys[Game.KEY_UP] = dy < -thr;
+    game.keys[Game.KEY_DOWN] = dy > thr;
+  }
+
+  function resetKeys() {
+    if (!game) return;
+    game.keys[Game.KEY_LEFT] = false;
+    game.keys[Game.KEY_RIGHT] = false;
+    game.keys[Game.KEY_UP] = false;
+    game.keys[Game.KEY_DOWN] = false;
+  }
+
+  function returnStick() {
+    const dist = Math.hypot(dx, dy);
+    const speed = Game.SHIP_ACCEL * 1000;
+    const dur = dist / speed;
+    stick.style.transition = `transform ${dur}s linear`;
+    stick.style.transform = 'translate(0px,0px)';
+    dx = dy = 0;
+    setTimeout(() => { stick.style.transition = ''; }, dur * 1000);
+  }
+
+  mobileControls.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    longPress = false;
+    lpTimer = setTimeout(() => {
+      longPress = true;
+      touchId = t.identifier;
+      joystick.style.left = `${t.clientX - radius}px`;
+      joystick.style.top = `${t.clientY - radius}px`;
+      joystick.classList.add('active');
+    }, 200);
   });
 
-  mobileAccel.addEventListener('touchstart', e => { e.preventDefault(); if (game) game.keys[Game.KEY_UP] = true; });
-  mobileAccel.addEventListener('touchend', e => { e.preventDefault(); if (game) game.keys[Game.KEY_UP] = false; });
-  mobileShoot.addEventListener('touchstart', e => { e.preventDefault(); if (game) game.keys[Game.KEY_SPACE] = true; });
-  mobileShoot.addEventListener('touchend', e => { e.preventDefault(); if (game) game.keys[Game.KEY_SPACE] = false; });
+  mobileControls.addEventListener('touchmove', e => {
+    if (touchId === null) return;
+    for (const t of e.touches) {
+      if (t.identifier === touchId) {
+        dx = t.clientX - (joystick.offsetLeft + radius);
+        dy = t.clientY - (joystick.offsetTop + radius);
+        const d = Math.hypot(dx, dy);
+        if (d > radius) {
+          const r = radius / d;
+          dx *= r; dy *= r;
+        }
+        stick.style.transform = `translate(${dx}px,${dy}px)`;
+        updateKeys();
+        break;
+      }
+    }
+  });
 
-  const shakeEvent = new Shake({ threshold: 15 });
-  shakeEvent.start();
-  window.addEventListener('shake', () => { if (game && !game.paused) game.triggerEnter(); }, false);
+  mobileControls.addEventListener('touchend', e => {
+    clearTimeout(lpTimer);
+    if (touchId === null) {
+      if (!longPress && game) {
+        game.keys[Game.KEY_SPACE] = true;
+        setTimeout(() => { if (game) game.keys[Game.KEY_SPACE] = false; }, 100);
+      }
+    } else {
+      resetKeys();
+      returnStick();
+      joystick.classList.remove('active');
+      touchId = null;
+    }
+  });
 }
 
 window.addEventListener('keydown', e => {
@@ -292,9 +355,6 @@ async function startGame() {
   hideCredits();
   hideScreens();
   if (audioCtx) audioCtx.resume();
-  if (isMobile && window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
-    try { await DeviceOrientationEvent.requestPermission(); } catch (e) {}
-  }
   let cfgText = '';
   try {
     const resp = await fetch('settings.json');

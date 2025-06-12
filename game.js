@@ -655,8 +655,8 @@ class Game {
         this.ship.angle = this.rotateStart + (this.rotateTarget - this.rotateStart) * t;
       }
       if (this.keys[Game.KEY_UP] || this.keys[Game.KEY_W]) {
-        this.ship.thrust.x += Math.cos(this.ship.angle) * 0.07;
-        this.ship.thrust.y += Math.sin(this.ship.angle) * 0.07;
+        this.ship.thrust.x += Math.cos(this.ship.angle) * 0.035;
+        this.ship.thrust.y += Math.sin(this.ship.angle) * 0.035;
         const exX = this.ship.x - Math.cos(this.ship.angle) * this.ship.radius;
         const exY = this.ship.y - Math.sin(this.ship.angle) * this.ship.radius;
         if (this.exhaustDelay <= 0) {
@@ -665,8 +665,8 @@ class Game {
         }
       }
       if (this.keys[Game.KEY_DOWN] || this.keys[Game.KEY_S]) {
-        this.ship.thrust.x -= Math.cos(this.ship.angle) * 0.035;
-        this.ship.thrust.y -= Math.sin(this.ship.angle) * 0.035;
+        this.ship.thrust.x -= Math.cos(this.ship.angle) * 0.0175;
+        this.ship.thrust.y -= Math.sin(this.ship.angle) * 0.0175;
         const exX = this.ship.x + Math.cos(this.ship.angle) * this.ship.radius;
         const exY = this.ship.y + Math.sin(this.ship.angle) * this.ship.radius;
         if (this.exhaustDelay <= 0) {
@@ -675,8 +675,8 @@ class Game {
         }
       }
       if (this.keys[Game.KEY_Q]) {
-        this.ship.thrust.x += Math.sin(this.ship.angle) * 0.035;
-        this.ship.thrust.y += -Math.cos(this.ship.angle) * 0.035;
+        this.ship.thrust.x += Math.sin(this.ship.angle) * 0.0175;
+        this.ship.thrust.y += -Math.cos(this.ship.angle) * 0.0175;
         const exX = this.ship.x + Math.sin(this.ship.angle) * this.ship.radius;
         const exY = this.ship.y - Math.cos(this.ship.angle) * this.ship.radius;
         if (this.exhaustDelay <= 0) {
@@ -685,8 +685,8 @@ class Game {
         }
       }
       if (this.keys[Game.KEY_E]) {
-        this.ship.thrust.x += -Math.sin(this.ship.angle) * 0.035;
-        this.ship.thrust.y += Math.cos(this.ship.angle) * 0.035;
+        this.ship.thrust.x += -Math.sin(this.ship.angle) * 0.0175;
+        this.ship.thrust.y += Math.cos(this.ship.angle) * 0.0175;
         const exX = this.ship.x - Math.sin(this.ship.angle) * this.ship.radius;
         const exY = this.ship.y + Math.cos(this.ship.angle) * this.ship.radius;
         if (this.exhaustDelay <= 0) {
@@ -1375,21 +1375,21 @@ Game.WORLD_SIZE = 3000;
 Game.MIN_INITIAL_ASTEROIDS = 10;
 Game.MAX_INITIAL_ASTEROIDS = 100;
 Game.MAX_ASTEROIDS = 100;
-Game.MAX_SPEED = 4;
+Game.MAX_SPEED = 2;
 Game.BULLET_MASS = 0.5;
 Game.GRAVITY = 5;
 Game.GRAVITY_MULT = 0.5;
 Game.PLANET_GRAVITY_MULT = 8;
 Game.GRAVITY_RANGE_FACTOR = 10.5;
-Game.SHIP_ACCEL = 0.07;
+Game.SHIP_ACCEL = 0.035;
 Game.GRAVITY_WARNING_RATIO = 0.8;
 Game.MAX_PLANETS = 3;
 Game.MIN_ENEMIES = 3;
 Game.MAX_ENEMIES = 10;
 Game.ENEMY_RADIUS = 20;
 Game.ENEMY_FONT_SIZE = 48;
-Game.ENEMY_MAX_SPEED = 4;
-Game.ENEMY_ACCEL = 0.05;
+Game.ENEMY_MAX_SPEED = 2;
+Game.ENEMY_ACCEL = 0.025;
 Game.ENEMY_DETECTION_RADIUS = 600;
 Game.ENEMY_HP = 1;
 Game.PALETTE = ['#fff', '#0ff', '#f0f', '#ff0', '#0f0', '#f00', '#00f', '#f80'];

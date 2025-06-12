@@ -13,7 +13,7 @@
   "bulletLife": 3,
   "shieldDuration": 30,
   "exhaustLife": 0.7,
-  "maxSpeed": 4,
+  "maxSpeed": 2,
   "bulletMass": 0.5,
   "gravityRangeFactor": 10.5,
   "gravityWarningRatio": 0.8,
