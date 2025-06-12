@@ -193,21 +193,22 @@ if (isMobile) {
   let lpTimer = null;
   let dx = 0, dy = 0;
   const radius = 40;
+  let lastTapX = 0, lastTapY = 0;
+  let returnAnim = null;
 
   function updateKeys() {
     if (!game) return;
     const thr = 10;
-    game.keys[Game.KEY_LEFT] = dx < -thr;
-    game.keys[Game.KEY_RIGHT] = dx > thr;
-    game.keys[Game.KEY_UP] = dy < -thr;
-    game.keys[Game.KEY_DOWN] = dy > thr;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 0) game.ship.angle = Math.atan2(dy, dx);
+    game.keys[Game.KEY_UP] = dist > thr;
   }
 
   function resetKeys() {
     if (!game) return;
+    game.keys[Game.KEY_UP] = false;
     game.keys[Game.KEY_LEFT] = false;
     game.keys[Game.KEY_RIGHT] = false;
-    game.keys[Game.KEY_UP] = false;
     game.keys[Game.KEY_DOWN] = false;
   }
 
@@ -218,12 +219,31 @@ if (isMobile) {
     const vy = game.ship.thrust.y * scale;
     stick.style.transform = `translate(${vx}px,${vy}px)`;
   }
+  function startReturn() {
+    if (returnAnim) cancelAnimationFrame(returnAnim);
+    const step = () => {
+      dx *= Game.SHIP_DRAG;
+      dy *= Game.SHIP_DRAG;
+      if (Math.hypot(dx, dy) < 0.5) {
+        dx = dy = 0;
+        stick.style.transform = '';
+        returnAnim = null;
+      } else {
+        stick.style.transform = `translate(${dx}px,${dy}px)`;
+        returnAnim = requestAnimationFrame(step);
+      }
+    };
+    returnAnim = requestAnimationFrame(step);
+  }
   window.updateJoystickIndicator = updateIndicator;
 
   mobileControls.addEventListener('touchstart', e => {
     e.preventDefault();
     const t = e.touches[0];
+    lastTapX = t.clientX;
+    lastTapY = t.clientY;
     longPress = false;
+    if (returnAnim) { cancelAnimationFrame(returnAnim); returnAnim = null; }
     lpTimer = setTimeout(() => {
       longPress = true;
       touchId = t.identifier;
@@ -248,14 +268,18 @@ if (isMobile) {
     clearTimeout(lpTimer);
     if (touchId === null) {
       if (!longPress && game) {
+        const rect = canvas.getBoundingClientRect();
+        const wx = game.viewportX + (lastTapX - rect.left);
+        const wy = game.viewportY + (lastTapY - rect.top);
+        game.ship.angle = Math.atan2(wy - game.ship.y, wx - game.ship.x);
         game.keys[Game.KEY_SPACE] = true;
         setTimeout(() => { if (game) game.keys[Game.KEY_SPACE] = false; }, 100);
       }
     } else {
       resetKeys();
-      dx = dy = 0;
       joystick.classList.remove('active');
       touchId = null;
+      startReturn();
     }
   });
 }
