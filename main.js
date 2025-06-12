@@ -1,4 +1,7 @@
 
+const GAME_NAME = 'Asteroids';
+const GAME_VERSION = '0.0.7';
+
 const canvas = document.getElementById('game');
 const mapCanvas = document.getElementById('minimap');
 const scoreEl = document.getElementById('score');
@@ -18,6 +21,12 @@ const creditsBack = document.getElementById('creditsBack');
 const settingsText = document.getElementById('settingsText');
 const resetBtn = document.getElementById('resetBtn');
 const menuStars = document.getElementById('menuStars');
+const menuTitle = document.getElementById('menuTitle');
+const footerVersion = document.getElementById('footerVersion');
+
+document.title = GAME_NAME;
+menuTitle.textContent = GAME_NAME;
+footerVersion.textContent = 'Wersja ' + GAME_VERSION;
 
 let starAnim;
 let starField = [];

@@ -24,7 +24,6 @@
   </style>
 </head>
 <body>
-  <h1>Asteroids</h1>
   <div id="wrapper">
     <canvas id="game"></canvas>
     <div id="sidebar">
@@ -40,6 +39,7 @@
 
   <div id="menu" class="screen">
     <canvas id="menuStars"></canvas>
+    <h1 id="menuTitle">Asteroids</h1>
     <button id="newGameBtn">Nowa gra</button>
     <button id="settingsBtn">Ustawienia</button>
     <button id="creditsBtn">Credits</button>
@@ -56,7 +56,7 @@
     <button id="creditsBack">Wróć</button>
   </div>
 
-  <div id="footer"><strong>Wersja 0.0.6</strong></div>
+  <div id="footer"><strong id="footerVersion">Wersja</strong></div>
 
   <script src="https://fraigo.github.io/javascript-midi-player/midiplayer/WebAudioFontPlayer.js"></script>
   <script src="https://fraigo.github.io/javascript-midi-player/midiplayer/MIDIFile.js"></script>
