@@ -2,6 +2,7 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const scoreEl = document.getElementById('score');
 const statusEl = document.getElementById('status');
+const timerEl = document.getElementById('timer');
 
 function resizeCanvas() {
   canvas.width = Math.max(window.innerWidth * 0.5, 800);
@@ -29,7 +30,8 @@ const ship = {
     y: Math.sin(startAngle) * 0.5
   },
   canShoot: true,
-  dead: false
+  dead: false,
+  color: '#fff'
 };
 
 let keys = {};
@@ -58,6 +60,9 @@ let sizeFactor = 1;
 let exhaust = [];
 const PICKUP_SIZE = DEFAULT_SHIP_RADIUS;
 const EXHAUST_LIFE = 0.5;
+const ROUND_TIME = 90;
+let timer = ROUND_TIME;
+let exhaustDelay = 0;
 
 function updateTopbar(){
   scoreEl.textContent = 'Score: ' + String(Math.floor(score)).padStart(5,'0');
@@ -65,10 +70,17 @@ function updateTopbar(){
   statusEl.innerHTML = 'Lives: ' + String(lives).padStart(2,'0') + '&nbsp;&nbsp;Armor: ' + armorStr;
 }
 
+function updateTimer(){
+  const m = Math.floor(timer/60);
+  const s = Math.floor(timer%60);
+  timerEl.textContent = `[${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}]`;
+}
+
 function addScore(hp){
   score += Math.pow(2,hp);
   if(score>99999) score = 99999;
   updateTopbar();
+  updateTimer();
 }
 
 function spawnParticles(x,y,count,color,life=1){
@@ -100,6 +112,7 @@ function explodeAsteroid(a){
 }
 
 updateTopbar();
+updateTimer();
 
 function spawnInitialAsteroids(num) {
   for (let i = 0; i < num; i++) {
@@ -130,7 +143,7 @@ function spawnAsteroid() {
   const color = palette[Math.floor(Math.random()*palette.length)];
   const hp = Math.max(1, Math.round(radius/15));
   const mass = radius * 0.5;
-  asteroids.push({ x, y, dx, dy, radius, points, color, hp, mass });
+  asteroids.push({ x, y, dx, dy, radius, points, color, hp, mass, spawnDelay: 0.5 });
 }
 
 function spawnPickup(){
@@ -156,6 +169,9 @@ function breakAsteroid(a, impactAngle) {
     const speed = Math.random() * 0.5 + 0.2;
     const dx = Math.cos(angle) * speed;
     const dy = Math.sin(angle) * speed;
+    const offset = radius * 0.75;
+    const spawnX = a.x + Math.cos(angle) * offset;
+    const spawnY = a.y + Math.sin(angle) * offset;
     const pts = [];
     const pc = Math.floor(Math.random() * 5) + 5;
     for (let j = 0; j < pc; j++) {
@@ -166,7 +182,7 @@ function breakAsteroid(a, impactAngle) {
     const color = palette[Math.floor(Math.random() * palette.length)];
     const hp = Math.max(1, a.hp - 1);
     const mass = radius * 0.5;
-    asteroids.push({ x: a.x, y: a.y, dx, dy, radius, points: pts, color, hp, mass });
+    asteroids.push({ x: spawnX, y: spawnY, dx, dy, radius, points: pts, color, hp, mass, spawnDelay: 0.3 });
   }
 }
 
@@ -244,7 +260,9 @@ function restartGame(){
   lives = 5;
   armor = 5;
   score = 0;
+  timer = ROUND_TIME;
   updateTopbar();
+  updateTimer();
   spawnInitialAsteroids(Math.floor(Math.random()*10)+1);
 }
 
@@ -284,6 +302,17 @@ function update(dt){
     return;
   }
 
+  timer -= dt;
+  if(timer <= 0){
+    if(!ship.dead) explodeShip();
+    gameOver = true;
+    restartTimer = 2;
+    timer = 0;
+    updateTimer();
+    return;
+  }
+  updateTimer();
+
   if(ship.dead){
     shipFragments.forEach(f=>{f.x+=f.dx;f.y+=f.dy;f.rot+=f.dr*dt;});
     respawnTimer -= dt;
@@ -296,7 +325,10 @@ function update(dt){
       ship.thrust.y += Math.sin(ship.angle)*0.1;
       const exX = ship.x - Math.cos(ship.angle)*ship.radius;
       const exY = ship.y - Math.sin(ship.angle)*ship.radius;
-      exhaust.push({x:exX,y:exY,r:2,life:EXHAUST_LIFE});
+      if(exhaustDelay<=0){
+        exhaust.push({x:exX,y:exY,r:2,life:EXHAUST_LIFE,color:ship.color});
+        exhaustDelay = 0.1;
+      }
     } else {
       ship.thrust.x *= 0.99;
       ship.thrust.y *= 0.99;
@@ -317,6 +349,7 @@ function update(dt){
   spawnInvul = Math.max(0, spawnInvul - dt);
   flashTimer = Math.max(0, flashTimer - dt);
   lineFlashTimer = Math.max(0, lineFlashTimer - dt);
+  if(exhaustDelay>0) exhaustDelay -= dt;
   if(sizeTimer>0){
     sizeTimer -= dt;
     if(sizeTimer<=0){
@@ -342,6 +375,7 @@ function update(dt){
   asteroids.forEach(a=>{
     a.x = (a.x + a.dx + canvas.width) % canvas.width;
     a.y = (a.y + a.dy + canvas.height) % canvas.height;
+    if(a.spawnDelay>0) a.spawnDelay = Math.max(0, a.spawnDelay - dt);
   });
 
   bullets.forEach((b,bi)=>{
@@ -366,6 +400,7 @@ function update(dt){
     const a=asteroids[i];
     for(let j=i+1;j<asteroids.length;j++){
       const b=asteroids[j];
+      if(a.spawnDelay>0 || b.spawnDelay>0) continue;
       if(Math.hypot(a.x-b.x,a.y-b.y)<a.radius+b.radius){
         const ang=Math.atan2(b.y-a.y,b.x-a.x);
         const force=0.5;
@@ -522,13 +557,13 @@ function draw(){
 
   exhaust.forEach(e=>{
     ctx.save();
-    ctx.globalAlpha = Math.max(0,e.life/EXHAUST_LIFE);
-    ctx.strokeStyle = '#08f';
+    ctx.globalAlpha = Math.max(0,e.life/EXHAUST_LIFE)*0.5;
+    ctx.strokeStyle = e.color;
     drawWrapped(e.x,e.y,e.r,()=>{ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,Math.PI*2);ctx.stroke();});
     ctx.restore();
   });
 
-  ctx.strokeStyle = lineFlashTimer>0 ? (Math.floor(lineFlashTimer*5)%2===0 ? '#fff' : '#f00') : '#fff';
+  ctx.strokeStyle = lineFlashTimer>0 ? (Math.floor(lineFlashTimer*5)%2===0 ? ship.color : '#f00') : ship.color;
   if(!ship.dead){
     if(spawnInvul<=0 || Math.floor(spawnInvul*10)%2===0){
       drawWrapped(ship.x, ship.y, ship.radius, ()=>{
