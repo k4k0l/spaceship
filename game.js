@@ -70,7 +70,6 @@ class Game {
       color: '#fff'
     };
     this.enterHeld = false;
-    this.flipRemaining = 0;
 
     window.addEventListener('keydown', e => { this.keys[e.keyCode] = true; });
     window.addEventListener('keyup', e => { this.keys[e.keyCode] = false; });
@@ -82,11 +81,13 @@ class Game {
     this.minAsteroids = settings.minAsteroids || Game.MIN_INITIAL_ASTEROIDS;
     this.maxAsteroids = settings.maxAsteroids || Game.MAX_INITIAL_ASTEROIDS;
     this.maxPlanets = settings.maxPlanets || Game.MAX_PLANETS;
+    this.minEnemies = settings.minEnemies || Game.MIN_ENEMIES;
     this.maxEnemies = settings.maxEnemies || Game.MAX_ENEMIES;
     this.spawnInitialAsteroids(Math.floor(Math.random() * (this.maxAsteroids - this.minAsteroids + 1)) + this.minAsteroids);
     this.spawnPlanets(this.maxPlanets);
     this.enemies = [];
-    for (let i = 0; i < this.maxEnemies; i++) this.spawnEnemy();
+    const enemyCount = Math.floor(Math.random() * (this.maxEnemies - this.minEnemies + 1)) + this.minEnemies;
+    for (let i = 0; i < enemyCount; i++) this.spawnEnemy();
   }
 
   /** Resize canvas to window size */
@@ -515,34 +516,20 @@ class Game {
       mctx.fill();
     });
 
-    // draw trajectory
-    mctx.strokeStyle = '#fff';
-    mctx.beginPath();
-    let tx = this.ship.x;
-    let ty = this.ship.y;
-    let vx = this.ship.thrust.x;
-    let vy = this.ship.thrust.y;
-    mctx.moveTo((tx / this.worldWidth) * mw, (ty / this.worldHeight) * mh);
-    for (let i = 0; i < 120; i++) {
-      this.planets.forEach(pl => {
-        const dx = pl.x - tx;
-        const dy = pl.y - ty;
-        const distSq = dx * dx + dy * dy;
-        const range = Game.gravityRange(pl.mass);
-        if (distSq > 1 && distSq < range * range) {
-          const dist = Math.sqrt(distSq);
-          const a = Game.GRAVITY * pl.mass / distSq;
-          vx += (dx / dist) * a;
-          vy += (dy / dist) * a;
-        }
-      });
-      tx += vx;
-      ty += vy;
-      const mx = (tx / this.worldWidth) * mw;
-      const my = (ty / this.worldHeight) * mh;
-      mctx.lineTo(mx, my);
+    // draw velocity vector
+    const speed = Math.hypot(this.ship.thrust.x, this.ship.thrust.y);
+    if (speed > 0) {
+      mctx.strokeStyle = '#fff';
+      mctx.beginPath();
+      mctx.moveTo((this.ship.x / this.worldWidth) * mw, (this.ship.y / this.worldHeight) * mh);
+      const scale = 10;
+      const vx = (this.ship.thrust.x / speed) * Math.min(speed * scale, 20);
+      const vy = (this.ship.thrust.y / speed) * Math.min(speed * scale, 20);
+      const ex = (this.ship.x + vx) / this.worldWidth * mw;
+      const ey = (this.ship.y + vy) / this.worldHeight * mh;
+      mctx.lineTo(ex, ey);
+      mctx.stroke();
     }
-    mctx.stroke();
 
     // ship
     const sx = (this.ship.x / this.worldWidth) * mw;
@@ -602,25 +589,18 @@ class Game {
       this.respawnTimer -= dt;
       if (this.respawnTimer <= 0) this.respawnShip();
     } else {
-      if (this.keys[Game.KEY_LEFT]) this.ship.angle -= 3 * dt;
-      if (this.keys[Game.KEY_RIGHT]) this.ship.angle += 3 * dt;
+      if (this.keys[Game.KEY_LEFT] || this.keys[Game.KEY_A]) this.ship.angle -= 3 * dt;
+      if (this.keys[Game.KEY_RIGHT] || this.keys[Game.KEY_D]) this.ship.angle += 3 * dt;
 
-      if (this.keys[Game.KEY_ENTER]) {
-        if (!this.enterHeld && this.flipRemaining <= 0) {
-          this.enterHeld = true;
-          this.flipRemaining = 0.3;
-        }
-      } else {
-        this.enterHeld = false;
+      if (this.keys[Game.KEY_ENTER] && !this.enterHeld) {
+        this.enterHeld = true;
+        const sp = Math.hypot(this.ship.thrust.x, this.ship.thrust.y);
+        if (sp > 0) this.ship.angle = Math.atan2(-this.ship.thrust.y, -this.ship.thrust.x);
       }
-      if (this.flipRemaining > 0) {
-        const step = Math.min(this.flipRemaining, dt);
-        this.ship.angle += Math.PI * (step / 0.3);
-        this.flipRemaining -= step;
-      }
-      if (this.keys[Game.KEY_UP]) {
-        this.ship.thrust.x += Math.cos(this.ship.angle) * 0.1;
-        this.ship.thrust.y += Math.sin(this.ship.angle) * 0.1;
+      if (!this.keys[Game.KEY_ENTER]) this.enterHeld = false;
+      if (this.keys[Game.KEY_UP] || this.keys[Game.KEY_W]) {
+        this.ship.thrust.x += Math.cos(this.ship.angle) * 0.07;
+        this.ship.thrust.y += Math.sin(this.ship.angle) * 0.07;
         const exX = this.ship.x - Math.cos(this.ship.angle) * this.ship.radius;
         const exY = this.ship.y - Math.sin(this.ship.angle) * this.ship.radius;
         if (this.exhaustDelay <= 0) {
@@ -628,14 +608,34 @@ class Game {
           this.exhaustDelay = 0.1;
         }
       }
-      if (this.keys[Game.KEY_DOWN]) {
-        this.ship.thrust.x -= Math.cos(this.ship.angle) * 0.05;
-        this.ship.thrust.y -= Math.sin(this.ship.angle) * 0.05;
+      if (this.keys[Game.KEY_DOWN] || this.keys[Game.KEY_S]) {
+        this.ship.thrust.x -= Math.cos(this.ship.angle) * 0.035;
+        this.ship.thrust.y -= Math.sin(this.ship.angle) * 0.035;
         const exX = this.ship.x + Math.cos(this.ship.angle) * this.ship.radius;
         const exY = this.ship.y + Math.sin(this.ship.angle) * this.ship.radius;
         if (this.exhaustDelay <= 0) {
           this.exhaust.push({ x: exX, y: exY, r: 1, life: Game.EXHAUST_LIFE, color: this.ship.color, type: 'front' });
           this.exhaustDelay = 0.15;
+        }
+      }
+      if (this.keys[Game.KEY_Q]) {
+        this.ship.thrust.x += -Math.sin(this.ship.angle) * 0.035;
+        this.ship.thrust.y += Math.cos(this.ship.angle) * 0.035;
+        const exX = this.ship.x - Math.sin(this.ship.angle) * this.ship.radius;
+        const exY = this.ship.y + Math.cos(this.ship.angle) * this.ship.radius;
+        if (this.exhaustDelay <= 0) {
+          this.exhaust.push({ x: exX, y: exY, r: 1, life: Game.EXHAUST_LIFE, color: this.ship.color, type: 'side' });
+          this.exhaustDelay = 0.1;
+        }
+      }
+      if (this.keys[Game.KEY_E]) {
+        this.ship.thrust.x += Math.sin(this.ship.angle) * 0.035;
+        this.ship.thrust.y += -Math.cos(this.ship.angle) * 0.035;
+        const exX = this.ship.x + Math.sin(this.ship.angle) * this.ship.radius;
+        const exY = this.ship.y - Math.cos(this.ship.angle) * this.ship.radius;
+        if (this.exhaustDelay <= 0) {
+          this.exhaust.push({ x: exX, y: exY, r: 1, life: Game.EXHAUST_LIFE, color: this.ship.color, type: 'side' });
+          this.exhaustDelay = 0.1;
         }
       }
       const sv = Math.hypot(this.ship.thrust.x, this.ship.thrust.y);
@@ -682,8 +682,8 @@ class Game {
           life: Game.BULLET_LIFE
         });
         if (window.playSound) window.playSound('shoot', this.ship.x, this.ship.y);
-        this.ship.thrust.x -= Math.cos(this.ship.angle) * 5 * Game.BULLET_MASS / this.ship.mass;
-        this.ship.thrust.y -= Math.sin(this.ship.angle) * 5 * Game.BULLET_MASS / this.ship.mass;
+        this.ship.thrust.x -= Math.cos(this.ship.angle) * 5 * Game.BULLET_MASS / this.ship.mass * 0.5;
+        this.ship.thrust.y -= Math.sin(this.ship.angle) * 5 * Game.BULLET_MASS / this.ship.mass * 0.5;
         this.ship.canShoot = false;
       }
       if (!this.keys[Game.KEY_SPACE]) this.ship.canShoot = true;
@@ -1198,6 +1198,12 @@ Game.KEY_RIGHT = 39;
 Game.KEY_DOWN = 40;
 Game.KEY_SPACE = 32;
 Game.KEY_ENTER = 13;
+Game.KEY_A = 65;
+Game.KEY_D = 68;
+Game.KEY_W = 87;
+Game.KEY_S = 83;
+Game.KEY_Q = 81;
+Game.KEY_E = 69;
 Game.DEFAULT_SHIP_RADIUS = 20;
 Game.DEFAULT_SHIP_MASS = 5;
 Game.BULLET_LIFE = 3;
@@ -1210,12 +1216,13 @@ Game.WORLD_SIZE = 3000;
 Game.MIN_INITIAL_ASTEROIDS = 10;
 Game.MAX_INITIAL_ASTEROIDS = 100;
 Game.MAX_ASTEROIDS = 100;
-Game.MAX_SPEED = 6;
+Game.MAX_SPEED = 4;
 Game.BULLET_MASS = 0.5;
-Game.GRAVITY = 3;
-Game.GRAVITY_RANGE_FACTOR = 5;
+Game.GRAVITY = 5;
+Game.GRAVITY_RANGE_FACTOR = 7;
 Game.MAX_PLANETS = 3;
-Game.MAX_ENEMIES = 0;
+Game.MIN_ENEMIES = 3;
+Game.MAX_ENEMIES = 10;
 Game.ENEMY_MAX_SPEED = 4;
 Game.ENEMY_ACCEL = 0.05;
 Game.ENEMY_DETECTION_RADIUS = 300;

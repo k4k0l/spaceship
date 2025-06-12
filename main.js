@@ -22,6 +22,7 @@ const roundTimeInput = document.getElementById('roundTime');
 const minAstInput = document.getElementById('minAst');
 const maxAstInput = document.getElementById('maxAst');
 const maxPlanetsInput = document.getElementById('maxPlanets');
+const minEnemiesInput = document.getElementById('minEnemies');
 const maxEnemiesInput = document.getElementById('maxEnemies');
 const menuStars = document.getElementById('menuStars');
 
@@ -158,6 +159,7 @@ function startGame() {
     minAsteroids: parseInt(minAstInput.value) || Game.MIN_INITIAL_ASTEROIDS,
     maxAsteroids: parseInt(maxAstInput.value) || Game.MAX_INITIAL_ASTEROIDS,
     maxPlanets: parseInt(maxPlanetsInput.value) || Game.MAX_PLANETS,
+    minEnemies: parseInt(minEnemiesInput.value) || Game.MIN_ENEMIES,
     maxEnemies: parseInt(maxEnemiesInput.value) || Game.MAX_ENEMIES
   };
   game = new Game(canvas, mapCanvas, scoreEl, livesEl, armorEl, timerEl, settings);
