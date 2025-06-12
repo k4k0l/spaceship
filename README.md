@@ -15,6 +15,8 @@ Aktualna wersja gry: **0.0.2**
 - Kompletny refaktor kodu: cała logika została przeniesiona do klasy `Game` w pliku `game.js` i uruchamiana jest z modułu `main.js`.
 - Dodano dokumentację w postaci komentarzy opisujących działanie poszczególnych metod i stałych.
 - Poprawiono strukturę projektu tak, aby łatwiej było rozwijać go w przyszłości.
+- Naprawiono błąd uniemożliwiający uruchomienie gry w przeglądarce (podwójna
+  deklaracja zmiennych w funkcji rysującej minimapę).
 
 ## Możliwości gry i przebieg rozgrywki
 - Sterowanie statkiem (obrót, przyspieszanie, strzał).
