@@ -484,7 +484,7 @@ class Game {
     let vx = this.ship.thrust.x;
     let vy = this.ship.thrust.y;
     mctx.moveTo((tx / this.worldWidth) * mw, (ty / this.worldHeight) * mh);
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 120; i++) {
       this.planets.forEach(pl => {
         const dx = pl.x - tx;
         const dy = pl.y - ty;
@@ -584,6 +584,20 @@ class Game {
           this.ship.thrust.y += (dy / dist) * a * dt;
         }
       });
+      this.asteroids.forEach(a => {
+        const dx = a.x - this.ship.x;
+        const dy = a.y - this.ship.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq > 1) {
+          const dist = Math.sqrt(distSq);
+          const accelShip = Game.GRAVITY * a.mass / distSq;
+          const accelAst = Game.GRAVITY * this.ship.mass / distSq;
+          this.ship.thrust.x += (dx / dist) * accelShip * dt;
+          this.ship.thrust.y += (dy / dist) * accelShip * dt;
+          a.dx -= (dx / dist) * accelAst * dt;
+          a.dy -= (dy / dist) * accelAst * dt;
+        }
+      });
       this.ship.x = (this.ship.x + this.ship.thrust.x + this.worldWidth) % this.worldWidth;
       this.ship.y = (this.ship.y + this.ship.thrust.y + this.worldHeight) % this.worldHeight;
       if (this.keys[Game.KEY_SPACE] && this.ship.canShoot) {
@@ -675,6 +689,25 @@ class Game {
         }
       });
     });
+
+    for (let i = 0; i < this.asteroids.length; i++) {
+      const a = this.asteroids[i];
+      for (let j = i + 1; j < this.asteroids.length; j++) {
+        const b = this.asteroids[j];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq > 1) {
+          const dist = Math.sqrt(distSq);
+          const accelA = Game.GRAVITY * b.mass / distSq;
+          const accelB = Game.GRAVITY * a.mass / distSq;
+          a.dx += (dx / dist) * accelA * dt;
+          a.dy += (dy / dist) * accelA * dt;
+          b.dx -= (dx / dist) * accelB * dt;
+          b.dy -= (dy / dist) * accelB * dt;
+        }
+      }
+    }
 
     for (let i = 0; i < this.asteroids.length; i++) {
       const a = this.asteroids[i];

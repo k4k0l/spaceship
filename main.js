@@ -71,11 +71,11 @@ function initStarField() {
   menuStars.width = window.innerWidth;
   menuStars.height = window.innerHeight;
   starField = [];
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 200; i++) {
     starField.push({
-      x: (Math.random() - 0.5) * menuStars.width,
-      y: (Math.random() - 0.5) * menuStars.height,
-      z: Math.random() * menuStars.width
+      x: Math.random() * menuStars.width,
+      y: Math.random() * menuStars.height,
+      phase: Math.random() * Math.PI * 2
     });
   }
 }
@@ -86,28 +86,14 @@ function renderStars() {
   const h = menuStars.height;
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = '#fff';
+  const t = performance.now() / 1000;
+  ctx.fillStyle = '#fff';
   for (const s of starField) {
-    s.z -= 10;
-    if (s.z <= 0) {
-      s.x = (Math.random() - 0.5) * w;
-      s.y = (Math.random() - 0.5) * h;
-      s.z = w;
-      s.px = s.x;
-      s.py = s.y;
-    }
-    const k = 128 / s.z;
-    const x = s.x * k + w / 2;
-    const y = s.y * k + h / 2;
-    const px = (s.px ?? s.x) * k + w / 2;
-    const py = (s.py ?? s.y) * k + h / 2;
-    ctx.beginPath();
-    ctx.moveTo(px, py);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    s.px = s.x;
-    s.py = s.y;
+    const a = 0.5 + 0.5 * Math.sin(t + s.phase);
+    ctx.globalAlpha = a;
+    ctx.fillRect(s.x, s.y, 2, 2);
   }
+  ctx.globalAlpha = 1;
   if (!menu.classList.contains('hidden')) starAnim = requestAnimationFrame(renderStars);
 }
 
