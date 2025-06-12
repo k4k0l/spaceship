@@ -195,6 +195,7 @@ class Game {
       dy: 0,
       angle: 0,
       alerted: false,
+      alertBlink: 0,
       detection: Game.ENEMY_DETECTION_RADIUS
     });
   }
@@ -521,13 +522,23 @@ class Game {
     if (speed > 0) {
       mctx.strokeStyle = '#fff';
       mctx.beginPath();
-      mctx.moveTo((this.ship.x / this.worldWidth) * mw, (this.ship.y / this.worldHeight) * mh);
+      const sx = (this.ship.x / this.worldWidth) * mw;
+      const sy = (this.ship.y / this.worldHeight) * mh;
+      mctx.moveTo(sx, sy);
       const scale = 10;
       const vx = (this.ship.thrust.x / speed) * Math.min(speed * scale, 20);
       const vy = (this.ship.thrust.y / speed) * Math.min(speed * scale, 20);
       const ex = (this.ship.x + vx) / this.worldWidth * mw;
       const ey = (this.ship.y + vy) / this.worldHeight * mh;
       mctx.lineTo(ex, ey);
+      mctx.stroke();
+      const ang = Math.atan2(ey - sy, ex - sx);
+      mctx.beginPath();
+      mctx.moveTo(ex, ey);
+      const ah = 4;
+      mctx.lineTo(ex - Math.cos(ang - Math.PI / 6) * ah, ey - Math.sin(ang - Math.PI / 6) * ah);
+      mctx.lineTo(ex - Math.cos(ang + Math.PI / 6) * ah, ey - Math.sin(ang + Math.PI / 6) * ah);
+      mctx.closePath();
       mctx.stroke();
     }
 
@@ -546,9 +557,10 @@ class Game {
         mctx.save();
         mctx.setLineDash([2, 2]);
         mctx.strokeStyle = '#f0f';
+        const alpha = 0.5 + 0.5 * Math.sin(e.alertBlink * 2);
+        mctx.globalAlpha = alpha;
         mctx.beginPath();
-        mctx.moveTo(ex, ey);
-        mctx.lineTo(sx, sy);
+        mctx.arc(ex, ey, e.detection / this.worldWidth * mw, 0, Math.PI * 2);
         mctx.stroke();
         mctx.restore();
       }
@@ -651,7 +663,7 @@ class Game {
         const range = Game.gravityRange(p.mass);
         if (distSq > 1 && distSq < range * range) {
           const dist = Math.sqrt(distSq);
-          const a = Game.GRAVITY * p.mass / distSq;
+          const a = Game.GRAVITY * Game.GRAVITY_MULT * p.mass / distSq;
           this.ship.thrust.x += (dx / dist) * a;
           this.ship.thrust.y += (dy / dist) * a;
         }
@@ -663,8 +675,8 @@ class Game {
         const range = Game.gravityRange(a.mass);
         if (distSq > 1 && distSq < range * range) {
           const dist = Math.sqrt(distSq);
-          const accelShip = Game.GRAVITY * a.mass / distSq;
-          const accelAst = Game.GRAVITY * this.ship.mass / distSq;
+          const accelShip = Game.GRAVITY * Game.GRAVITY_MULT * a.mass / distSq;
+          const accelAst = Game.GRAVITY * Game.GRAVITY_MULT * this.ship.mass / distSq;
           this.ship.thrust.x += (dx / dist) * accelShip;
           this.ship.thrust.y += (dy / dist) * accelShip;
           a.dx -= (dx / dist) * accelAst;
@@ -710,7 +722,7 @@ class Game {
         const range = Game.gravityRange(p.mass);
         if (distSq > 1 && distSq < range * range) {
           const dist = Math.sqrt(distSq);
-          const a = Game.GRAVITY * p.mass / distSq;
+          const a = Game.GRAVITY * Game.GRAVITY_MULT * p.mass / distSq;
           b.dx += (dx / dist) * a * dt;
           b.dy += (dy / dist) * a * dt;
         }
@@ -736,7 +748,7 @@ class Game {
         const range = Game.gravityRange(p.mass);
         if (distSq > 1 && distSq < range * range) {
           const dist = Math.sqrt(distSq);
-          const accel = Game.GRAVITY * p.mass / distSq;
+          const accel = Game.GRAVITY * Game.GRAVITY_MULT * p.mass / distSq;
           a.dx += (dx / dist) * accel * dt;
           a.dy += (dy / dist) * accel * dt;
         }
@@ -776,8 +788,8 @@ class Game {
         const rangeB = Game.gravityRange(b.mass);
         if (distSq > 1 && (distSq < rangeA * rangeA || distSq < rangeB * rangeB)) {
           const dist = Math.sqrt(distSq);
-          const accelA = Game.GRAVITY * b.mass / distSq;
-          const accelB = Game.GRAVITY * a.mass / distSq;
+          const accelA = Game.GRAVITY * Game.GRAVITY_MULT * b.mass / distSq;
+          const accelB = Game.GRAVITY * Game.GRAVITY_MULT * a.mass / distSq;
           a.dx += (dx / dist) * accelA * dt;
           a.dy += (dy / dist) * accelA * dt;
           b.dx -= (dx / dist) * accelB * dt;
@@ -907,7 +919,7 @@ class Game {
         const range = Game.gravityRange(pl.mass);
         if (distSq > 1 && distSq < range * range) {
           const dist = Math.sqrt(distSq);
-          const a = Game.GRAVITY * pl.mass / distSq;
+          const a = Game.GRAVITY * Game.GRAVITY_MULT * pl.mass / distSq;
           p.dx += (dx / dist) * a * dt;
           p.dy += (dy / dist) * a * dt;
         }
@@ -982,6 +994,7 @@ class Game {
       const distToShip = Math.hypot(e.x - this.ship.x, e.y - this.ship.y);
       if (distToShip < e.detection && !this.ship.dead) {
         if (!e.alerted) { e.alerted = true; if (window.playSound) window.playSound('alarm'); }
+        e.alertBlink += dt;
         const dx = this.ship.x - e.x;
         const dy = this.ship.y - e.y;
         const d = Math.hypot(dx, dy) || 1;
@@ -990,6 +1003,7 @@ class Game {
         if (distToShip < this.ship.radius + 10) this.explodeShip();
       } else {
         e.alerted = false;
+        e.alertBlink = 0;
         e.dx += (Math.random() - 0.5) * Game.ENEMY_ACCEL;
         e.dy += (Math.random() - 0.5) * Game.ENEMY_ACCEL;
       }
@@ -1219,6 +1233,7 @@ Game.MAX_ASTEROIDS = 100;
 Game.MAX_SPEED = 4;
 Game.BULLET_MASS = 0.5;
 Game.GRAVITY = 5;
+Game.GRAVITY_MULT = 0.2;
 Game.GRAVITY_RANGE_FACTOR = 7;
 Game.MAX_PLANETS = 3;
 Game.MIN_ENEMIES = 3;
