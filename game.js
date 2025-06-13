@@ -40,6 +40,8 @@ class Game {
     this.planets = [];
     // ensure enemies array exists before any spawns
     this.enemies = [];
+    this.peerShip = null;
+    this.dataChannel = null;
 
     this.paused = false;
 
@@ -592,6 +594,12 @@ class Game {
     const sy = (this.ship.y / this.worldHeight) * mh;
     mctx.fillStyle = '#fff';
     mctx.fillRect(sx - 2, sy - 2, 4, 4);
+    if (this.peerShip) {
+      const px = (this.peerShip.x / this.worldWidth) * mw;
+      const py = (this.peerShip.y / this.worldHeight) * mh;
+      mctx.fillStyle = '#0f0';
+      mctx.fillRect(px - 2, py - 2, 4, 4);
+    }
 
     this.enemies.forEach(e => {
       const ex = (e.x / this.worldWidth) * mw;
@@ -1179,6 +1187,10 @@ class Game {
       e.y = (e.y + e.dy + this.worldHeight) % this.worldHeight;
       e.angle = Math.atan2(e.dy, e.dx);
     }
+    if (this.dataChannel && this.dataChannel.readyState === 'open') {
+      const msg = JSON.stringify({ type: 'state', ship: { x: this.ship.x, y: this.ship.y, angle: this.ship.angle } });
+      try { this.dataChannel.send(msg); } catch {}
+    }
 
     this.updateCamera();
   }
@@ -1278,6 +1290,22 @@ class Game {
       });
     }
 
+    if (this.peerShip) {
+      ctx.strokeStyle = this.peerShip.color || '#0f0';
+      this.drawWrapped(this.peerShip.x, this.peerShip.y, this.peerShip.radius, () => {
+        ctx.save();
+        ctx.translate(this.peerShip.x, this.peerShip.y);
+        ctx.rotate(this.peerShip.angle);
+        ctx.beginPath();
+        ctx.moveTo(this.peerShip.radius, 0);
+        ctx.lineTo(-this.peerShip.radius, this.peerShip.radius / 2);
+        ctx.lineTo(-this.peerShip.radius, -this.peerShip.radius / 2);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+      });
+    }
+
     this.bullets.forEach(b => {
       ctx.save();
       ctx.globalAlpha = Math.max(0, b.life / Game.BULLET_LIFE);
@@ -1369,6 +1397,21 @@ class Game {
     this.onEnd = onEnd;
     this.running = true;
     requestAnimationFrame(t => { this.lastTime = t; this.loop(t); });
+  }
+
+  setDataChannel(ch) {
+    this.dataChannel = ch;
+    if (ch) {
+      ch.onmessage = e => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'state') {
+            if (!this.peerShip) this.peerShip = { radius: this.ship.radius, color: '#0f0' };
+            Object.assign(this.peerShip, msg.ship);
+          }
+        } catch {}
+      };
+    }
   }
 }
 
