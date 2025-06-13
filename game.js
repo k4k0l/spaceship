@@ -85,7 +85,7 @@ class Game {
     };
     this.enterHeld = false;
     this.rotateAnim = 0;
-    this.rotateDuration = 0.15;
+    this.rotateDuration = Game.DEFAULT_ROTATE_DURATION;
     this.rotateStart = 0;
     this.rotateTarget = 0;
 
@@ -361,7 +361,8 @@ class Game {
   }
 
   /** Rotate ship smoothly towards specified angle */
-  rotateTo(angle) {
+  rotateTo(angle, duration = Game.DEFAULT_ROTATE_DURATION) {
+    this.rotateDuration = duration;
     this.rotateStart = this.ship.angle;
     this.rotateTarget = angle;
     let diff = ((this.rotateTarget - this.rotateStart + Math.PI) % (Math.PI * 2)) - Math.PI;
@@ -597,8 +598,13 @@ class Game {
     if (this.peerShip) {
       const px = (this.peerShip.x / this.worldWidth) * mw;
       const py = (this.peerShip.y / this.worldHeight) * mh;
-      mctx.fillStyle = '#0f0';
-      mctx.fillRect(px - 2, py - 2, 4, 4);
+      mctx.strokeStyle = '#0f0';
+      mctx.beginPath();
+      mctx.moveTo(px - 2, py - 2);
+      mctx.lineTo(px + 2, py + 2);
+      mctx.moveTo(px + 2, py - 2);
+      mctx.lineTo(px - 2, py + 2);
+      mctx.stroke();
     }
 
     this.enemies.forEach(e => {
@@ -1449,6 +1455,8 @@ Game.PLANET_GRAVITY_MULT = 8;
 Game.GRAVITY_RANGE_FACTOR = 10.5;
 Game.SHIP_ACCEL = 0.035;
 Game.SHIP_DRAG = 0.98;
+Game.DEFAULT_ROTATE_DURATION = 0.15;
+Game.FAST_ROTATE_DURATION = 0.05;
 // warn about strong gravity sooner
 Game.GRAVITY_WARNING_RATIO = 0.4;
 Game.MAX_PLANETS = 3;
