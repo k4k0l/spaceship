@@ -37,7 +37,10 @@ const footerVersion = document.getElementById('footerVersion');
 document.title = GAME_NAME;
 menuTitle.textContent = GAME_NAME;
 footerVersion.textContent = 'Version ' + GAME_VERSION;
-if (isMobile) mobileControls.classList.remove('hidden');
+if (isMobile) {
+  mobileControls.classList.remove('hidden');
+  document.body.classList.add('mobile');
+}
 
 let starAnim;
 let starField = [];
@@ -197,6 +200,8 @@ if (isMobile) {
   let maxRadius = 0;
   let lastTapX = 0, lastTapY = 0;
   let returnAnim = null;
+  let releaseTimeout = null;
+  const HOLD_DELAY = 150;
 
   function updateMaxRadius() {
     maxRadius = Math.min(window.innerWidth, window.innerHeight) / 2 - stickRadius;
@@ -257,6 +262,7 @@ if (isMobile) {
     lastTapX = t.clientX;
     lastTapY = t.clientY;
     longPress = false;
+    if (releaseTimeout) { clearTimeout(releaseTimeout); releaseTimeout = null; }
     if (returnAnim) { cancelAnimationFrame(returnAnim); returnAnim = null; }
     lpTimer = setTimeout(() => {
       longPress = true;
@@ -299,10 +305,13 @@ if (isMobile) {
         }, game.rotateDuration * 1000);
       }
     } else {
-      resetKeys();
       joystick.classList.remove('active');
       touchId = null;
-      startReturn();
+      releaseTimeout = setTimeout(() => {
+        resetKeys();
+        startReturn();
+        releaseTimeout = null;
+      }, HOLD_DELAY);
     }
   });
 }
@@ -418,7 +427,9 @@ async function startGame() {
     maxAsteroids: parseInt(cfg.maxAsteroids) || Game.MAX_INITIAL_ASTEROIDS,
     maxPlanets: parseInt(cfg.maxPlanets) || Game.MAX_PLANETS,
     minEnemies: parseInt(cfg.minEnemies) || Game.MIN_ENEMIES,
-    maxEnemies: parseInt(cfg.maxEnemies) || Game.MAX_ENEMIES
+    maxEnemies: parseInt(cfg.maxEnemies) || Game.MAX_ENEMIES,
+    zoom: isMobile ? 0.8 : 1,
+    isMobile
   };
   game = new Game(canvas, mapCanvas, scoreEl, livesEl, armorEl, timerEl, enemiesEl, settings);
   game.paused = false;

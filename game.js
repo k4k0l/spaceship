@@ -25,6 +25,8 @@ class Game {
 
     this.worldWidth = settings.worldSize || Game.WORLD_SIZE;
     this.worldHeight = settings.worldSize || Game.WORLD_SIZE;
+    this.zoom = settings.zoom || 1;
+    this.isMobile = settings.isMobile || false;
 
     this.keys = {};
     this.bullets = [];
@@ -106,10 +108,15 @@ class Game {
   /** Resize canvas to window size */
   resizeCanvas() {
     const margin = 20;
-    this.canvas.width = window.innerWidth - margin;
-    this.canvas.height = window.innerHeight - margin;
-    this.mapCanvas.width = 150;
-    this.mapCanvas.height = 150;
+    const dispW = window.innerWidth - margin;
+    const dispH = window.innerHeight - margin;
+    this.canvas.style.width = dispW + 'px';
+    this.canvas.style.height = dispH + 'px';
+    this.canvas.width = Math.floor(dispW / this.zoom);
+    this.canvas.height = Math.floor(dispH / this.zoom);
+    const mapSize = this.isMobile ? 112 : 150;
+    this.mapCanvas.width = mapSize;
+    this.mapCanvas.height = mapSize;
   }
 
   /** Update score/lives display */
@@ -1399,7 +1406,8 @@ Game.PLANET_GRAVITY_MULT = 8;
 Game.GRAVITY_RANGE_FACTOR = 10.5;
 Game.SHIP_ACCEL = 0.035;
 Game.SHIP_DRAG = 0.98;
-Game.GRAVITY_WARNING_RATIO = 0.8;
+// warn about strong gravity sooner
+Game.GRAVITY_WARNING_RATIO = 0.4;
 Game.MAX_PLANETS = 3;
 Game.MIN_ENEMIES = 3;
 Game.MAX_ENEMIES = 10;
