@@ -1,6 +1,6 @@
 
 const GAME_NAME = 'Asteroids';
-const GAME_VERSION = '0.1.0';
+const GAME_VERSION = '0.1.1';
 
 const canvas = document.getElementById('game');
 const mapCanvas = document.getElementById('minimap');
@@ -78,6 +78,27 @@ const defaultSettingsText = `{
 
 function parseJSONC(text) {
   return JSON.parse(text.replace(/\/\/.*$/gm, ''));
+}
+
+function copyToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).catch(() => {});
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch {}
+    document.body.removeChild(ta);
+  }
+}
+
+function encodeSession(obj) {
+  return LZString.compressToEncodedURIComponent(JSON.stringify(obj));
+}
+
+function decodeSession(str) {
+  return JSON.parse(LZString.decompressFromEncodedURIComponent(str));
 }
 
 function generateSettingsText(values) {
@@ -459,15 +480,16 @@ async function startHost() {
   peerConnection = createPeer();
   dataChannel = peerConnection.createDataChannel('game');
   dataChannel.onopen = () => { if (game) game.setDataChannel(dataChannel); };
-  peerConnection.onicecandidate = e => {
-    if (!e.candidate) {
-      const offerStr = btoa(JSON.stringify({ type: 'offer', sdp: peerConnection.localDescription.sdp }));
-      prompt('Share this link with a friend:', `${location.origin}${location.pathname}?session=${offerStr}`);
-    }
-  };
+
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
-  const ans = prompt('Paste answer link when ready:');
+  await new Promise(res => {
+    peerConnection.onicecandidate = e => { if (!e.candidate) res(); };
+  });
+  const link = `${location.origin}${location.pathname}?session=${encodeSession({ type: 'offer', sdp: peerConnection.localDescription.sdp })}`;
+  copyToClipboard(link);
+  alert('Share this link with a friend (copied to clipboard):\n' + link);
+  const ans = prompt('Paste answer link here when ready:');
   if (ans) handleSessionLink(ans);
 }
 
@@ -481,7 +503,7 @@ async function startJoin() {
 }
 
 async function joinWithSession(session) {
-  const data = JSON.parse(atob(session));
+  const data = decodeSession(session);
   if (data.type !== 'offer') return;
   peerConnection = createPeer();
   peerConnection.ondatachannel = e => {
@@ -493,8 +515,10 @@ async function joinWithSession(session) {
   await peerConnection.setLocalDescription(answer);
   peerConnection.onicecandidate = e => {
     if (!e.candidate) {
-      const ansStr = btoa(JSON.stringify({ type: 'answer', sdp: peerConnection.localDescription.sdp }));
-      prompt('Send this link back to host:', `${location.origin}${location.pathname}?session=${ansStr}`);
+      const ansStr = encodeSession({ type: 'answer', sdp: peerConnection.localDescription.sdp });
+      const link = `${location.origin}${location.pathname}?session=${ansStr}`;
+      copyToClipboard(link);
+      alert('Send this link back to host (copied to clipboard):\n' + link);
     }
   };
   startGame();
@@ -504,7 +528,7 @@ async function handleSessionLink(url) {
   try {
     const session = new URL(url).searchParams.get('session');
     if (!session) return;
-    const data = JSON.parse(atob(session));
+    const data = decodeSession(session);
     if (data.type === 'answer' && peerConnection) {
       await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: data.sdp }));
       startGame();
