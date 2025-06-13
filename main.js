@@ -1,6 +1,6 @@
 
 const GAME_NAME = 'Asteroids';
-const GAME_VERSION = '0.0.10';
+const GAME_VERSION = '0.1.0';
 
 const canvas = document.getElementById('game');
 const mapCanvas = document.getElementById('minimap');
@@ -15,6 +15,10 @@ const settingsScreen = document.getElementById('settingsScreen');
 const creditsScreen = document.getElementById('creditsScreen');
 const controlsScreen = document.getElementById('controlsScreen');
 const aboutScreen = document.getElementById('aboutScreen');
+const modeScreen = document.getElementById('modeScreen');
+const singleBtn = document.getElementById('singleBtn');
+const hostBtn = document.getElementById('hostBtn');
+const joinBtn = document.getElementById('joinBtn');
 const newGameBtn = document.getElementById('newGameBtn');
 const settingsBtn = document.getElementById('settingsBtn');
 const controlsBtn = document.getElementById('controlsBtn');
@@ -333,6 +337,7 @@ function hideScreens() {
   if (menuMusic) menuMusic.pause();
   menu.classList.add('hidden');
   settingsScreen.classList.add('hidden');
+  modeScreen.classList.add('hidden');
   controlsScreen.classList.add('hidden');
   aboutScreen.classList.add('hidden');
   creditsScreen.classList.add('hidden');
@@ -352,6 +357,11 @@ function showMenu() {
   } else {
     menuMusic.play();
   }
+}
+
+function showModeScreen() {
+  hideScreens();
+  modeScreen.classList.remove('hidden');
 }
 
 function showSettings() {
@@ -436,11 +446,84 @@ async function startGame() {
   game.start(() => { game.paused = true; showMenu(); });
 }
 
-newGameBtn.onclick = startGame;
+let peerConnection = null;
+let dataChannel = null;
+
+function createPeer() {
+  const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+  pc.oniceconnectionstatechange = () => console.log('ice', pc.iceConnectionState);
+  return pc;
+}
+
+async function startHost() {
+  peerConnection = createPeer();
+  dataChannel = peerConnection.createDataChannel('game');
+  dataChannel.onopen = () => { if (game) game.setDataChannel(dataChannel); };
+  peerConnection.onicecandidate = e => {
+    if (!e.candidate) {
+      const offerStr = btoa(JSON.stringify({ type: 'offer', sdp: peerConnection.localDescription.sdp }));
+      prompt('Share this link with a friend:', `${location.origin}${location.pathname}?session=${offerStr}`);
+    }
+  };
+  const offer = await peerConnection.createOffer();
+  await peerConnection.setLocalDescription(offer);
+  const ans = prompt('Paste answer link when ready:');
+  if (ans) handleSessionLink(ans);
+}
+
+async function startJoin() {
+  const link = prompt('Paste host link:');
+  if (!link) return;
+  const url = new URL(link);
+  const session = url.searchParams.get('session');
+  if (!session) return;
+  await joinWithSession(session);
+}
+
+async function joinWithSession(session) {
+  const data = JSON.parse(atob(session));
+  if (data.type !== 'offer') return;
+  peerConnection = createPeer();
+  peerConnection.ondatachannel = e => {
+    dataChannel = e.channel;
+    dataChannel.onopen = () => { if (game) game.setDataChannel(dataChannel); };
+  };
+  await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: data.sdp }));
+  const answer = await peerConnection.createAnswer();
+  await peerConnection.setLocalDescription(answer);
+  peerConnection.onicecandidate = e => {
+    if (!e.candidate) {
+      const ansStr = btoa(JSON.stringify({ type: 'answer', sdp: peerConnection.localDescription.sdp }));
+      prompt('Send this link back to host:', `${location.origin}${location.pathname}?session=${ansStr}`);
+    }
+  };
+  startGame();
+}
+
+async function handleSessionLink(url) {
+  try {
+    const session = new URL(url).searchParams.get('session');
+    if (!session) return;
+    const data = JSON.parse(atob(session));
+    if (data.type === 'answer' && peerConnection) {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: data.sdp }));
+      startGame();
+    } else if (data.type === 'offer') {
+      await joinWithSession(session);
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+newGameBtn.onclick = showModeScreen;
 settingsBtn.onclick = showSettings;
 controlsBtn.onclick = showControls;
 aboutBtn.onclick = showAbout;
 creditsBtn.onclick = showCredits;
+singleBtn.onclick = startGame;
+hostBtn.onclick = startHost;
+joinBtn.onclick = startJoin;
 backBtn.onclick = () => {
   const txt = editor.getValue();
   let cfg;
@@ -460,8 +543,14 @@ controlsBack.onclick = () => { showMenu(); };
 aboutBack.onclick = () => { showMenu(); };
 creditsBack.onclick = () => { hideCredits(); showMenu(); };
 
-[newGameBtn, settingsBtn, controlsBtn, aboutBtn, creditsBtn, backBtn, controlsBack, aboutBack, creditsBack, resetBtn].forEach(btn => {
+[newGameBtn, settingsBtn, controlsBtn, aboutBtn, creditsBtn, backBtn, controlsBack, aboutBack, creditsBack, resetBtn, singleBtn, hostBtn, joinBtn].forEach(btn => {
   btn.addEventListener('mouseenter', () => playTone(880, 0.05));
 });
 
 showMenu();
+
+// auto join if session parameter present
+const sessionParam = new URLSearchParams(location.search).get('session');
+if (sessionParam) {
+  handleSessionLink(location.href);
+}
