@@ -302,11 +302,6 @@ if (isMobile) {
       if (t.identifier === touchId) {
         dx = t.clientX - (joystick.offsetLeft + joystickRadius);
         dy = t.clientY - (joystick.offsetTop + joystickRadius);
-        const dist = Math.hypot(dx, dy);
-        if (dist > maxRadius) {
-          dx = (dx / dist) * maxRadius;
-          dy = (dy / dist) * maxRadius;
-        }
         stick.style.transform = `translate(${dx}px,${dy}px)`;
         updateKeys();
         break;
@@ -322,12 +317,9 @@ if (isMobile) {
         const wx = game.viewportX + (lastTapX - rect.left);
         const wy = game.viewportY + (lastTapY - rect.top);
         const angle = Math.atan2(wy - game.ship.y, wx - game.ship.x);
-        game.rotateTo(angle);
-        setTimeout(() => {
-          if (!game) return;
-          game.keys[Game.KEY_SPACE] = true;
-          setTimeout(() => { if (game) game.keys[Game.KEY_SPACE] = false; }, 100);
-        }, game.rotateDuration * 1000);
+        game.rotateTo(angle, Game.FAST_ROTATE_DURATION);
+        game.keys[Game.KEY_SPACE] = true;
+        setTimeout(() => { if (game) game.keys[Game.KEY_SPACE] = false; }, 100);
       }
     } else {
       joystick.classList.remove('active');
