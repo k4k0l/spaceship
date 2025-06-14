@@ -529,6 +529,7 @@ async function handleSessionLink(url) {
     }
   } catch (e) {
     console.error(e);
+    alert('Failed to load multiplayer session link. Please check that the URL is correct.');
   }
 }
 
