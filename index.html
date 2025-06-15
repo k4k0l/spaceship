@@ -20,6 +20,7 @@
     button { font-family: 'Doto', sans-serif; font-size: 48px; margin: 10px; padding: 10px 20px; }
     #shareOverlay textarea { width: 80%; height: 80px; overflow: auto; }
     #shareOverlay button { font-size: 24px; margin: 5px; }
+    #shareOverlay { z-index: 250; }
     .key { display:inline-block; border:1px solid #fff; border-radius:4px; padding:2px 6px; margin:0 2px; font-size:32px; }
     #footer { margin-top: 10px; font-size: 14px; color: #888; font-weight: bold;
               position: fixed; bottom: 0; left: 0; width: 100%; z-index: 101; }
@@ -80,6 +81,8 @@
   <div id="mobileControls" class="hidden">
     <div id="joystick"><div id="stick"></div></div>
   </div>
+  </div>
+
   <div id="shareOverlay" class="screen hidden">
     <h2>Share Link</h2>
     <textarea id="shareLink" readonly style="width:80%;height:80px;overflow:auto;"></textarea>
@@ -92,7 +95,6 @@
       <button id="shareClose">Close</button>
     </div>
   </div>
-</div>
 
   <div id="menu" class="screen">
     <canvas id="menuStars"></canvas>
