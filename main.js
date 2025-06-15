@@ -9,6 +9,16 @@ const livesEl = document.getElementById('lives');
 const armorEl = document.getElementById('armor');
 const timerEl = document.getElementById('timer');
 const enemiesEl = document.getElementById('enemies');
+const pingEl = document.getElementById('ping');
+const wrapper = document.getElementById('wrapper');
+const shareOverlay = document.getElementById('shareOverlay');
+const shareLink = document.getElementById('shareLink');
+const shortenBtn = document.getElementById('shortenBtn');
+const copyLinkBtn = document.getElementById('copyLinkBtn');
+const waBtn = document.getElementById('waBtn');
+const msgrBtn = document.getElementById('msgrBtn');
+const smsBtn = document.getElementById('smsBtn');
+const shareClose = document.getElementById('shareClose');
 
 const menu = document.getElementById('menu');
 const settingsScreen = document.getElementById('settingsScreen');
@@ -52,6 +62,7 @@ let lastStarTime = 0;
 let menuMusic;
 let editor;
 let settingsData = '';
+let isHost = false;
 const midiUrl = 'data:audio/midi;base64,TVRoZAAAAAYAAQAGAYBNVHJrAAAAGgD/WAQEAmAIAP9/AwAAQQD/UQMJiWgA/y8ATVRyawAAANoA/wMAALEAAADBUACxCj8A/1kCAAAAsQd/AJFDZIIggUMAAJFFZIFAgUUAAJFIZGCBSAAAkUdkgiCBRwAAkUNkgiCBQwAAkUhkgiCBSAAAkUpkgUCBSgAAkU1kYIFNAACRTGSCIIFMAACRSmSCIIFKAACRS2SCIIFLAACRSmSBQIFKAACRSGRggUgAAJFGZIIggUYAAJFLZIIggUsAAJFSZIIggVIAAJFPZIFAgU8AAJFLZGCBSwAAkUpkgiCBSgAAkU9kgUCBTwAAkUxkYLEHAIMAgUwAAP8vAE1UcmsAAAFAAP8DAACyAAAAwlAAsgo/AP9ZAgAAALIHfwCSTGSBQIJMAACSQ2RggkMAAJJKZIFAgkoAAJJFZGCCRQAAkkhkgUCCSAAAkkNkYIJDAACSRWSBQIJFAACSSGRggkgAAJJMZIFAgkwAAJJDZGCCQwAAkkpkgUCCSgAAkkVkYIJFAACSSGSBQIJIAACSQ2RggkMAAJJIZIFAgkgAAJJPZGCCTwAAklBkgUCCUAAAkk9kYIJPAACSTWSBQIJNAACSS2RggksAAJJKZIFAgkoAAJJIZGCCSAAAkkZkgUCCRgAAkkpkYIJKAACSS2SBQIJLAACSTWRggk0AAJJLZIFAgksAAJJIZGCCSAAAkk1kYIJNAACSSmRggkoAAJJFZGCCRQAAkkpkYIJKAACSR2RggkcAAJJFZGCyBwCDAIJFAAD/LwBNVHJrAAABQAD/AwAAswAAAMNQALMKPwD/WQIAAACzB38Ak0NkgUCDQwAAk0hkYINIAACTSmSBQINKAACTTWRgg00AAJNMZIFAg0wAAJNIZGCDSAAAk0pkgUCDSgAAk1FkYINRAACTT2SBQINPAACTSGRgg0gAAJNKZIFAg0oAAJNNZGCDTQAAk0xkgUCDTAAAk0hkYINIAACTT2SBQINPAACTU2Rgg1MAAJNUZIFAg1QAAJNSZGCDUgAAk1BkgUCDUAAAk09kYINPAACTTWSBQINNAACTS2Rgg0sAAJNKZIFAg0oAAJNGZGCDRgAAk1JkgUCDUgAAk1RkYINUAACTUmSBQINSAACTT2Rgg08AAJNRZGCDUQAAk01kYINNAACTSmRgg0oAAJNPZGCDTwAAk0xkYINMAACTSmRgswcAgwCDSgAA/y8ATVRyawAAABIA/wMAALQKPwD/WQIAAAD/LwBNVHJrAAAADgD/AwAA/1kCAAAA/y8A';
 
 const defaultSettingsText = `{
@@ -91,6 +102,27 @@ function copyToClipboard(text) {
     try { document.execCommand('copy'); } catch {}
     document.body.removeChild(ta);
   }
+}
+
+function showShareOverlay(link) {
+  shareLink.value = link;
+  shareOverlay.classList.remove('hidden');
+  shortenBtn.onclick = async () => {
+    try {
+      const resp = await fetch('https://cleanuri.com/api/v1/shorten', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'url=' + encodeURIComponent(shareLink.value)
+      });
+      const data = await resp.json();
+      if (data.result_url) shareLink.value = data.result_url;
+    } catch {}
+  };
+  copyLinkBtn.onclick = () => copyToClipboard(shareLink.value);
+  waBtn.onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(shareLink.value), '_blank');
+  msgrBtn.onclick = () => window.open('fb-messenger://share?link=' + encodeURIComponent(shareLink.value), '_blank');
+  smsBtn.onclick = () => window.open('sms:?&body=' + encodeURIComponent(shareLink.value), '_blank');
+  shareClose.onclick = () => { shareOverlay.classList.add('hidden'); };
 }
 
 function encodeSession(obj) {
@@ -345,6 +377,35 @@ window.addEventListener('keydown', e => {
   }
 });
 
+let swipeActive = false;
+let swipeStartX = 0;
+canvas.addEventListener('touchstart', e => {
+  const t = e.touches[0];
+  if (t.clientX > window.innerWidth - 40) {
+    swipeActive = true;
+    swipeStartX = t.clientX;
+    wrapper.style.transition = 'none';
+  }
+});
+canvas.addEventListener('touchmove', e => {
+  if (!swipeActive) return;
+  const t = e.touches[0];
+  const dx = t.clientX - swipeStartX;
+  if (dx < 0) wrapper.style.transform = `translateX(${dx}px)`;
+});
+canvas.addEventListener('touchend', e => {
+  if (!swipeActive) return;
+  const dx = e.changedTouches[0].clientX - swipeStartX;
+  wrapper.style.transition = 'transform 0.3s ease';
+  if (dx < -window.innerWidth * 0.5) {
+    wrapper.style.transform = 'translateX(-100%)';
+    setTimeout(() => { wrapper.style.transition = ''; wrapper.style.transform = 'translateX(0)'; showMenu(); }, 300);
+  } else {
+    wrapper.style.transform = 'translateX(0)';
+  }
+  swipeActive = false;
+});
+
 function hideScreens() {
   cancelAnimationFrame(starAnim);
   if (menuMusic) menuMusic.pause();
@@ -359,6 +420,7 @@ function hideScreens() {
 function showMenu() {
   hideScreens();
   menu.classList.remove('hidden');
+  wrapper.style.transform = 'translateX(0)';
   if (isMobile) mobileControls.classList.add('hidden');
   if (audioCtx) audioCtx.suspend();
   initStarField();
@@ -428,6 +490,8 @@ async function startGame() {
   hideScreens();
   if (isMobile) mobileControls.classList.remove('hidden');
   if (audioCtx) audioCtx.resume();
+  wrapper.style.transform = 'translateX(-100%)';
+  requestAnimationFrame(() => { wrapper.style.transform = 'translateX(0)'; });
   let cfgText = '';
   try {
     const resp = await fetch('settings.json');
@@ -452,7 +516,9 @@ async function startGame() {
     minEnemies: parseInt(cfg.minEnemies) || Game.MIN_ENEMIES,
     maxEnemies: parseInt(cfg.maxEnemies) || Game.MAX_ENEMIES,
     zoom: isMobile ? 0.8 : 1,
-    isMobile
+    isMobile,
+    pingEl,
+    isHost
   };
   game = new Game(canvas, mapCanvas, scoreEl, livesEl, armorEl, timerEl, enemiesEl, settings);
   game.paused = false;
@@ -472,6 +538,7 @@ async function startHost() {
   peerConnection = createPeer();
   dataChannel = peerConnection.createDataChannel('game');
   dataChannel.onopen = () => { if (game) game.setDataChannel(dataChannel); };
+  isHost = true;
 
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
@@ -479,8 +546,7 @@ async function startHost() {
     peerConnection.onicecandidate = e => { if (!e.candidate) res(); };
   });
   const link = `${location.origin}${location.pathname}?session=${encodeSession({ type: 'offer', sdp: peerConnection.localDescription.sdp })}`;
-  copyToClipboard(link);
-  alert('Share this link with a friend (copied to clipboard):\n' + link);
+  showShareOverlay(link);
   const ans = prompt('Paste answer link here when ready:');
   if (ans) handleSessionLink(ans);
 }
@@ -509,10 +575,10 @@ async function joinWithSession(session) {
     if (!e.candidate) {
       const ansStr = encodeSession({ type: 'answer', sdp: peerConnection.localDescription.sdp });
       const link = `${location.origin}${location.pathname}?session=${ansStr}`;
-      copyToClipboard(link);
-      alert('Send this link back to host (copied to clipboard):\n' + link);
+      showShareOverlay(link);
     }
   };
+  isHost = false;
   startGame();
 }
 
