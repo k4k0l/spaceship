@@ -29,6 +29,7 @@ const modeScreen = document.getElementById('modeScreen');
 const singleBtn = document.getElementById('singleBtn');
 const hostBtn = document.getElementById('hostBtn');
 const joinBtn = document.getElementById('joinBtn');
+const resumeBtn = document.getElementById('resumeBtn');
 const newGameBtn = document.getElementById('newGameBtn');
 const settingsBtn = document.getElementById('settingsBtn');
 const controlsBtn = document.getElementById('controlsBtn');
@@ -382,7 +383,18 @@ window.addEventListener('keydown', e => {
     } else if (!menu.classList.contains('hidden')) {
       hideScreens();
       game.paused = false;
+      game.setStatus('In game');
     }
+  }
+});
+
+mapCanvas.addEventListener('click', () => {
+  if (!menu.classList.contains('hidden')) {
+    hideScreens();
+    if (game) { game.paused = false; game.setStatus('In game'); }
+  } else if (game) {
+    game.paused = true;
+    showMenu();
   }
 });
 
@@ -424,11 +436,18 @@ function hideScreens() {
   controlsScreen.classList.add('hidden');
   aboutScreen.classList.add('hidden');
   creditsScreen.classList.add('hidden');
+  resumeBtn.classList.add('hidden');
 }
 
 function showMenu() {
   hideScreens();
   menu.classList.remove('hidden');
+  if (game && game.paused) {
+    resumeBtn.classList.remove('hidden');
+    game.setStatus('Paused');
+  } else {
+    resumeBtn.classList.add('hidden');
+  }
   wrapper.style.transform = 'translateX(0)';
   if (isMobile) mobileControls.classList.add('hidden');
   if (audioCtx) audioCtx.suspend();
@@ -535,6 +554,7 @@ async function startGame() {
   };
   game = new Game(canvas, mapCanvas, scoreEl, livesEl, armorEl, timerEl, enemiesEl, settings);
   game.paused = false;
+  game.setStatus('Playing');
   game.start(() => { game.paused = true; showMenu(); });
 }
 
@@ -548,6 +568,7 @@ function createPeer() {
 }
 
 async function startHost() {
+  pingEl.textContent = '(--ms) Hosting...';
   peerConnection = createPeer();
   dataChannel = peerConnection.createDataChannel('game');
   dataChannel.onopen = () => { if (game) game.setDataChannel(dataChannel); };
@@ -566,6 +587,7 @@ async function startHost() {
 }
 
 async function startJoin() {
+  pingEl.textContent = '(--ms) Joining...';
   const link = prompt('Paste host link:');
   if (!link) return;
   const url = new URL(link);
@@ -621,6 +643,10 @@ creditsBtn.onclick = showCredits;
 singleBtn.onclick = startGame;
 hostBtn.onclick = startHost;
 joinBtn.onclick = startJoin;
+resumeBtn.onclick = () => {
+  hideScreens();
+  if (game) { game.paused = false; game.setStatus('In game'); }
+};
 backBtn.onclick = () => {
   const txt = editor.getValue();
   let cfg;
@@ -640,7 +666,7 @@ controlsBack.onclick = () => { showMenu(); };
 aboutBack.onclick = () => { showMenu(); };
 creditsBack.onclick = () => { hideCredits(); showMenu(); };
 
-[newGameBtn, settingsBtn, controlsBtn, aboutBtn, creditsBtn, backBtn, controlsBack, aboutBack, creditsBack, resetBtn, singleBtn, hostBtn, joinBtn].forEach(btn => {
+[newGameBtn, settingsBtn, controlsBtn, aboutBtn, creditsBtn, backBtn, controlsBack, aboutBack, creditsBack, resetBtn, singleBtn, hostBtn, joinBtn, resumeBtn].forEach(btn => {
   btn.addEventListener('mouseenter', () => playTone(880, 0.05));
 });
 
