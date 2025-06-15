@@ -22,6 +22,7 @@ class Game {
     this.pingEl = settings.pingEl || null;
     this.isHost = settings.isHost || false;
     this.ping = 0;
+    this.statusMessage = '';
     this.stateSendDelay = 0;
 
     // TODO: refactor input handling to support touch events for mobile devices
@@ -143,8 +144,14 @@ class Game {
     const enemyCount = Array.isArray(this.enemies) ? this.enemies.length : 0;
     this.enemiesEl.innerHTML = 'Enemies: <span style="color:#f0f">' + enemyCount + '</span>';
     if (this.pingEl) {
-      this.pingEl.textContent = 'Ping: ' + Math.round(this.ping) + 'ms';
+      const pingStr = '(' + Math.round(this.ping) + 'ms)';
+      this.pingEl.textContent = pingStr + ' ' + (this.statusMessage || '');
     }
+  }
+
+  setStatus(msg) {
+    this.statusMessage = msg;
+    this.updateTopbar();
   }
 
   /** Update camera viewport to follow the ship */
@@ -626,7 +633,7 @@ class Game {
     if (this.peerShip) {
       const px = (this.peerShip.x / this.worldWidth) * mw;
       const py = (this.peerShip.y / this.worldHeight) * mh;
-      mctx.strokeStyle = '#0f0';
+      mctx.strokeStyle = '#f00';
       mctx.beginPath();
       mctx.moveTo(px - 2, py - 2);
       mctx.lineTo(px + 2, py + 2);
@@ -662,6 +669,15 @@ class Game {
     } else {
       this.canvas.style.border = 'none';
     }
+    // close icon
+    mctx.strokeStyle = '#fff';
+    mctx.beginPath();
+    mctx.arc(mw - 10, 10, 8, 0, Math.PI * 2);
+    mctx.moveTo(mw - 13, 7);
+    mctx.lineTo(mw - 7, 13);
+    mctx.moveTo(mw - 7, 7);
+    mctx.lineTo(mw - 13, 13);
+    mctx.stroke();
   }
 
   /** Update game state */
@@ -1330,7 +1346,7 @@ class Game {
     }
 
     if (this.peerShip) {
-      ctx.strokeStyle = this.peerShip.color || '#0f0';
+      ctx.strokeStyle = this.peerShip.color || '#f00';
       this.drawWrapped(this.peerShip.x, this.peerShip.y, this.peerShip.radius, () => {
         ctx.save();
         ctx.translate(this.peerShip.x, this.peerShip.y);
@@ -1441,21 +1457,27 @@ class Game {
   setDataChannel(ch) {
     this.dataChannel = ch;
     if (ch) {
-      ch.onopen = () => {
+      const sendInit = () => {
         if (this.isHost) {
           const initMsg = { type: 'state', world: this.getWorldState(), ship: { x: this.ship.x, y: this.ship.y, angle: this.ship.angle } };
           try { ch.send(JSON.stringify(initMsg)); } catch {}
         }
+        this.setStatus('Connected');
       };
+      if (ch.readyState === 'open') {
+        sendInit();
+      } else {
+        ch.onopen = sendInit;
+      }
       ch.onmessage = e => {
         try {
           const msg = JSON.parse(e.data);
           if (msg.type === 'state' && !this.isHost) {
             this.setWorldState(msg.world);
-            if (!this.peerShip) this.peerShip = { radius: this.ship.radius, color: '#0f0' };
+            if (!this.peerShip) this.peerShip = { radius: this.ship.radius, color: '#f00' };
             Object.assign(this.peerShip, msg.ship);
           } else if (msg.type === 'ship' && this.isHost) {
-            if (!this.peerShip) this.peerShip = { radius: this.ship.radius, color: '#0f0' };
+            if (!this.peerShip) this.peerShip = { radius: this.ship.radius, color: '#f00' };
             Object.assign(this.peerShip, msg.ship);
           } else if (msg.type === 'ping') {
             ch.send(JSON.stringify({ type: 'pong', t: msg.t }));
