@@ -19,6 +19,10 @@ class Game {
     this.armorEl = armorEl;
     this.timerEl = timerEl;
     this.enemiesEl = enemiesEl;
+    this.pingEl = settings.pingEl || null;
+    this.isHost = settings.isHost || false;
+    this.ping = 0;
+    this.stateSendDelay = 0;
 
     // TODO: refactor input handling to support touch events for mobile devices
     // TODO: investigate networking options for future multiplayer mode
@@ -138,6 +142,9 @@ class Game {
     this.armorEl.innerHTML = armorHtml;
     const enemyCount = Array.isArray(this.enemies) ? this.enemies.length : 0;
     this.enemiesEl.innerHTML = 'Enemies: <span style="color:#f0f">' + enemyCount + '</span>';
+    if (this.pingEl) {
+      this.pingEl.textContent = 'Ping: ' + Math.round(this.ping) + 'ms';
+    }
   }
 
   /** Update camera viewport to follow the ship */
@@ -160,6 +167,27 @@ class Game {
     const sy = (y - this.viewportY + this.worldHeight) % this.worldHeight;
     return sx >= -margin && sx <= this.canvas.width + margin &&
            sy >= -margin && sy <= this.canvas.height + margin;
+  }
+
+  getWorldState() {
+    return JSON.parse(JSON.stringify({
+      worldWidth: this.worldWidth,
+      worldHeight: this.worldHeight,
+      asteroids: this.asteroids,
+      planets: this.planets,
+      enemies: this.enemies,
+      pickups: this.pickups
+    }));
+  }
+
+  setWorldState(state) {
+    this.worldWidth = state.worldWidth;
+    this.worldHeight = state.worldHeight;
+    this.asteroids = state.asteroids || [];
+    this.planets = state.planets || [];
+    this.enemies = state.enemies || [];
+    this.pickups = state.pickups || [];
+    this.updateTopbar();
   }
 
   /** Update timer display */
@@ -1194,8 +1222,13 @@ class Game {
       e.angle = Math.atan2(e.dy, e.dx);
     }
     if (this.dataChannel && this.dataChannel.readyState === 'open') {
-      const msg = JSON.stringify({ type: 'state', ship: { x: this.ship.x, y: this.ship.y, angle: this.ship.angle } });
-      try { this.dataChannel.send(msg); } catch {}
+      let msg;
+      if (this.isHost) {
+        msg = { type: 'state', world: this.getWorldState(), ship: { x: this.ship.x, y: this.ship.y, angle: this.ship.angle } };
+      } else {
+        msg = { type: 'ship', ship: { x: this.ship.x, y: this.ship.y, angle: this.ship.angle } };
+      }
+      try { this.dataChannel.send(JSON.stringify(msg)); } catch {}
     }
 
     this.updateCamera();
@@ -1408,15 +1441,37 @@ class Game {
   setDataChannel(ch) {
     this.dataChannel = ch;
     if (ch) {
+      ch.onopen = () => {
+        if (this.isHost) {
+          const initMsg = { type: 'state', world: this.getWorldState(), ship: { x: this.ship.x, y: this.ship.y, angle: this.ship.angle } };
+          try { ch.send(JSON.stringify(initMsg)); } catch {}
+        }
+      };
       ch.onmessage = e => {
         try {
           const msg = JSON.parse(e.data);
-          if (msg.type === 'state') {
+          if (msg.type === 'state' && !this.isHost) {
+            this.setWorldState(msg.world);
             if (!this.peerShip) this.peerShip = { radius: this.ship.radius, color: '#0f0' };
             Object.assign(this.peerShip, msg.ship);
+          } else if (msg.type === 'ship' && this.isHost) {
+            if (!this.peerShip) this.peerShip = { radius: this.ship.radius, color: '#0f0' };
+            Object.assign(this.peerShip, msg.ship);
+          } else if (msg.type === 'ping') {
+            ch.send(JSON.stringify({ type: 'pong', t: msg.t }));
+          } else if (msg.type === 'pong') {
+            this.ping = performance.now() - msg.t;
+            this.updateTopbar();
           }
         } catch {}
       };
+      this.pingInterval = setInterval(() => {
+        if (ch.readyState === 'open') {
+          ch.send(JSON.stringify({ type: 'ping', t: performance.now() }));
+        }
+      }, 1000);
+    } else {
+      clearInterval(this.pingInterval);
     }
   }
 }
