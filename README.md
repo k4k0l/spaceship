@@ -65,3 +65,13 @@ Wszystkie powyższe wartości można teraz modyfikować w menu **Ustawienia**. P
 - Wsparcie dla sterowania dotykowego na urządzeniach mobilnych.
 - Tryb wieloosobowy lokalny lub sieciowy.
 - Zapis najlepszych wyników w pamięci przeglądarki.
+
+## Problemy z udostępnianiem linków
+
+Tryb multiplayer generuje bardzo długie adresy URL z zakodowaną konfiguracją sesji.
+Niektóre komunikatory (np. WhatsApp) potrafią przy wklejaniu takiego linku
+niepoprawnie go podzielić, przez co po kliknięciu pojawia się komunikat o błędnym adresie.
+Najbezpieczniej jest przesyłać go w całości, najlepiej bez żadnych dodatkowych
+znaków lub formatowania. Jeśli nadal pojawiają się problemy,
+warto użyć zewnętrznego skracacza, np. [cleanuri.com](https://cleanuri.com/),
+i przesłać skrócony odnośnik.
