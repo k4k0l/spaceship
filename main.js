@@ -63,6 +63,7 @@ let menuMusic;
 let editor;
 let settingsData = '';
 let isHost = false;
+let introPlayed = false;
 const midiUrl = 'data:audio/midi;base64,TVRoZAAAAAYAAQAGAYBNVHJrAAAAGgD/WAQEAmAIAP9/AwAAQQD/UQMJiWgA/y8ATVRyawAAANoA/wMAALEAAADBUACxCj8A/1kCAAAAsQd/AJFDZIIggUMAAJFFZIFAgUUAAJFIZGCBSAAAkUdkgiCBRwAAkUNkgiCBQwAAkUhkgiCBSAAAkUpkgUCBSgAAkU1kYIFNAACRTGSCIIFMAACRSmSCIIFKAACRS2SCIIFLAACRSmSBQIFKAACRSGRggUgAAJFGZIIggUYAAJFLZIIggUsAAJFSZIIggVIAAJFPZIFAgU8AAJFLZGCBSwAAkUpkgiCBSgAAkU9kgUCBTwAAkUxkYLEHAIMAgUwAAP8vAE1UcmsAAAFAAP8DAACyAAAAwlAAsgo/AP9ZAgAAALIHfwCSTGSBQIJMAACSQ2RggkMAAJJKZIFAgkoAAJJFZGCCRQAAkkhkgUCCSAAAkkNkYIJDAACSRWSBQIJFAACSSGRggkgAAJJMZIFAgkwAAJJDZGCCQwAAkkpkgUCCSgAAkkVkYIJFAACSSGSBQIJIAACSQ2RggkMAAJJIZIFAgkgAAJJPZGCCTwAAklBkgUCCUAAAkk9kYIJPAACSTWSBQIJNAACSS2RggksAAJJKZIFAgkoAAJJIZGCCSAAAkkZkgUCCRgAAkkpkYIJKAACSS2SBQIJLAACSTWRggk0AAJJLZIFAgksAAJJIZGCCSAAAkk1kYIJNAACSSmRggkoAAJJFZGCCRQAAkkpkYIJKAACSR2RggkcAAJJFZGCyBwCDAIJFAAD/LwBNVHJrAAABQAD/AwAAswAAAMNQALMKPwD/WQIAAACzB38Ak0NkgUCDQwAAk0hkYINIAACTSmSBQINKAACTTWRgg00AAJNMZIFAg0wAAJNIZGCDSAAAk0pkgUCDSgAAk1FkYINRAACTT2SBQINPAACTSGRgg0gAAJNKZIFAg0oAAJNNZGCDTQAAk0xkgUCDTAAAk0hkYINIAACTT2SBQINPAACTU2Rgg1MAAJNUZIFAg1QAAJNSZGCDUgAAk1BkgUCDUAAAk09kYINPAACTTWSBQINNAACTS2Rgg0sAAJNKZIFAg0oAAJNGZGCDRgAAk1JkgUCDUgAAk1RkYINUAACTUmSBQINSAACTT2Rgg08AAJNRZGCDUQAAk01kYINNAACTSmRgg0oAAJNPZGCDTwAAk0xkYINMAACTSmRgswcAgwCDSgAA/y8ATVRyawAAABIA/wMAALQKPwD/WQIAAAD/LwBNVHJrAAAADgD/AwAA/1kCAAAA/y8A';
 
 const defaultSettingsText = `{
@@ -104,7 +105,7 @@ function copyToClipboard(text) {
   }
 }
 
-function showShareOverlay(link) {
+function showShareOverlay(link, onClose) {
   shareLink.value = link;
   shareOverlay.classList.remove('hidden');
   shortenBtn.onclick = async () => {
@@ -122,7 +123,10 @@ function showShareOverlay(link) {
   waBtn.onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(shareLink.value), '_blank');
   msgrBtn.onclick = () => window.open('fb-messenger://share?link=' + encodeURIComponent(shareLink.value), '_blank');
   smsBtn.onclick = () => window.open('sms:?&body=' + encodeURIComponent(shareLink.value), '_blank');
-  shareClose.onclick = () => { shareOverlay.classList.add('hidden'); };
+  shareClose.onclick = () => {
+    shareOverlay.classList.add('hidden');
+    if (onClose) onClose();
+  };
 }
 
 function encodeSession(obj) {
@@ -188,6 +192,11 @@ function playNoise(duration) {
   src.stop(audioCtx.currentTime + duration);
 }
 window.playNoise = playNoise;
+
+function playIntroTune() {
+  const notes = [659, 784, 523, 1047, 784, 659, 523];
+  notes.forEach((n, i) => setTimeout(() => playTone(n, 0.15), i * 200));
+}
 
 window.playSound = function(type, x, y) {
   if (!game) return;
@@ -423,6 +432,7 @@ function showMenu() {
   wrapper.style.transform = 'translateX(0)';
   if (isMobile) mobileControls.classList.add('hidden');
   if (audioCtx) audioCtx.suspend();
+  if (!introPlayed) { introPlayed = true; playIntroTune(); }
   initStarField();
   starAnim = requestAnimationFrame(renderStars);
   if (!menuMusic) {
@@ -490,7 +500,10 @@ async function startGame() {
   hideScreens();
   if (isMobile) mobileControls.classList.remove('hidden');
   if (audioCtx) audioCtx.resume();
+  wrapper.style.transition = 'none';
   wrapper.style.transform = 'translateX(-100%)';
+  wrapper.offsetWidth; // force reflow
+  wrapper.style.transition = 'transform 0.5s ease-out';
   requestAnimationFrame(() => { wrapper.style.transform = 'translateX(0)'; });
   let cfgText = '';
   try {
@@ -546,9 +559,10 @@ async function startHost() {
     peerConnection.onicecandidate = e => { if (!e.candidate) res(); };
   });
   const link = `${location.origin}${location.pathname}?session=${encodeSession({ type: 'offer', sdp: peerConnection.localDescription.sdp })}`;
-  showShareOverlay(link);
-  const ans = prompt('Paste answer link here when ready:');
-  if (ans) handleSessionLink(ans);
+  showShareOverlay(link, () => {
+    const ans = prompt('Paste answer link here when ready:');
+    if (ans) handleSessionLink(ans);
+  });
 }
 
 async function startJoin() {
