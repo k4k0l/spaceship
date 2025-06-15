@@ -11,6 +11,7 @@ const timerEl = document.getElementById('timer');
 const enemiesEl = document.getElementById('enemies');
 const pingEl = document.getElementById('ping');
 const wrapper = document.getElementById('wrapper');
+const swipeHandle = document.getElementById('swipeHandle');
 const shareOverlay = document.getElementById('shareOverlay');
 const shareLink = document.getElementById('shareLink');
 const shortenBtn = document.getElementById('shortenBtn');
@@ -64,6 +65,7 @@ let menuMusic;
 let editor;
 let settingsData = '';
 let isHost = false;
+let pendingStatus = '';
 let introPlayed = false;
 const midiUrl = 'data:audio/midi;base64,TVRoZAAAAAYAAQAGAYBNVHJrAAAAGgD/WAQEAmAIAP9/AwAAQQD/UQMJiWgA/y8ATVRyawAAANoA/wMAALEAAADBUACxCj8A/1kCAAAAsQd/AJFDZIIggUMAAJFFZIFAgUUAAJFIZGCBSAAAkUdkgiCBRwAAkUNkgiCBQwAAkUhkgiCBSAAAkUpkgUCBSgAAkU1kYIFNAACRTGSCIIFMAACRSmSCIIFKAACRS2SCIIFLAACRSmSBQIFKAACRSGRggUgAAJFGZIIggUYAAJFLZIIggUsAAJFSZIIggVIAAJFPZIFAgU8AAJFLZGCBSwAAkUpkgiCBSgAAkU9kgUCBTwAAkUxkYLEHAIMAgUwAAP8vAE1UcmsAAAFAAP8DAACyAAAAwlAAsgo/AP9ZAgAAALIHfwCSTGSBQIJMAACSQ2RggkMAAJJKZIFAgkoAAJJFZGCCRQAAkkhkgUCCSAAAkkNkYIJDAACSRWSBQIJFAACSSGRggkgAAJJMZIFAgkwAAJJDZGCCQwAAkkpkgUCCSgAAkkVkYIJFAACSSGSBQIJIAACSQ2RggkMAAJJIZIFAgkgAAJJPZGCCTwAAklBkgUCCUAAAkk9kYIJPAACSTWSBQIJNAACSS2RggksAAJJKZIFAgkoAAJJIZGCCSAAAkkZkgUCCRgAAkkpkYIJKAACSS2SBQIJLAACSTWRggk0AAJJLZIFAgksAAJJIZGCCSAAAkk1kYIJNAACSSmRggkoAAJJFZGCCRQAAkkpkYIJKAACSR2RggkcAAJJFZGCyBwCDAIJFAAD/LwBNVHJrAAABQAD/AwAAswAAAMNQALMKPwD/WQIAAACzB38Ak0NkgUCDQwAAk0hkYINIAACTSmSBQINKAACTTWRgg00AAJNMZIFAg0wAAJNIZGCDSAAAk0pkgUCDSgAAk1FkYINRAACTT2SBQINPAACTSGRgg0gAAJNKZIFAg0oAAJNNZGCDTQAAk0xkgUCDTAAAk0hkYINIAACTT2SBQINPAACTU2Rgg1MAAJNUZIFAg1QAAJNSZGCDUgAAk1BkgUCDUAAAk09kYINPAACTTWSBQINNAACTS2Rgg0sAAJNKZIFAg0oAAJNGZGCDRgAAk1JkgUCDUgAAk1RkYINUAACTUmSBQINSAACTT2Rgg08AAJNRZGCDUQAAk01kYINNAACTSmRgg0oAAJNPZGCDTwAAk0xkYINMAACTSmRgswcAgwCDSgAA/y8ATVRyawAAABIA/wMAALQKPwD/WQIAAAD/LwBNVHJrAAAADgD/AwAA/1kCAAAA/y8A';
 
@@ -388,15 +390,6 @@ window.addEventListener('keydown', e => {
   }
 });
 
-mapCanvas.addEventListener('click', () => {
-  if (!menu.classList.contains('hidden')) {
-    hideScreens();
-    if (game) { game.paused = false; game.setStatus('In game'); }
-  } else if (game) {
-    game.paused = true;
-    showMenu();
-  }
-});
 
 let swipeActive = false;
 let swipeStartX = 0;
@@ -406,21 +399,33 @@ canvas.addEventListener('touchstart', e => {
     swipeActive = true;
     swipeStartX = t.clientX;
     wrapper.style.transition = 'none';
+    swipeHandle.classList.add('active');
+    swipeHandle.style.transform = 'translateX(0)';
   }
 });
 canvas.addEventListener('touchmove', e => {
   if (!swipeActive) return;
   const t = e.touches[0];
   const dx = t.clientX - swipeStartX;
-  if (dx < 0) wrapper.style.transform = `translateX(${dx}px)`;
+  if (dx < 0) {
+    wrapper.style.transform = `translateX(${dx}px)`;
+    swipeHandle.style.transform = `translateX(${dx}px)`;
+  }
 });
 canvas.addEventListener('touchend', e => {
   if (!swipeActive) return;
   const dx = e.changedTouches[0].clientX - swipeStartX;
   wrapper.style.transition = 'transform 0.3s ease';
-  if (dx < -window.innerWidth * 0.5) {
+  swipeHandle.classList.remove('active');
+  swipeHandle.style.transform = 'translateX(0)';
+  if (e.changedTouches[0].clientX < 30) {
     wrapper.style.transform = 'translateX(-100%)';
-    setTimeout(() => { wrapper.style.transition = ''; wrapper.style.transform = 'translateX(0)'; showMenu(); }, 300);
+    setTimeout(() => {
+      wrapper.style.transition = '';
+      wrapper.style.transform = 'translateX(0)';
+      if (game) game.paused = true;
+      showMenu();
+    }, 300);
   } else {
     wrapper.style.transform = 'translateX(0)';
   }
@@ -554,7 +559,8 @@ async function startGame() {
   };
   game = new Game(canvas, mapCanvas, scoreEl, livesEl, armorEl, timerEl, enemiesEl, settings);
   game.paused = false;
-  game.setStatus('Playing');
+  game.setStatus(pendingStatus || 'Playing');
+  pendingStatus = '';
   game.start(() => { game.paused = true; showMenu(); });
 }
 
@@ -563,12 +569,16 @@ let dataChannel = null;
 
 function createPeer() {
   const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-  pc.oniceconnectionstatechange = () => console.log('ice', pc.iceConnectionState);
+  pc.oniceconnectionstatechange = () => {
+    console.log('ice', pc.iceConnectionState);
+    if (game) game.setStatus(pc.iceConnectionState);
+  };
   return pc;
 }
 
 async function startHost() {
   pingEl.textContent = '(--ms) Hosting...';
+  pendingStatus = 'Hosting...';
   peerConnection = createPeer();
   dataChannel = peerConnection.createDataChannel('game');
   dataChannel.onopen = () => { if (game) game.setDataChannel(dataChannel); };
@@ -588,6 +598,7 @@ async function startHost() {
 
 async function startJoin() {
   pingEl.textContent = '(--ms) Joining...';
+  pendingStatus = 'Joining...';
   const link = prompt('Paste host link:');
   if (!link) return;
   const url = new URL(link);
@@ -599,6 +610,7 @@ async function startJoin() {
 async function joinWithSession(session) {
   const data = decodeSession(session);
   if (data.type !== 'offer') return;
+  pendingStatus = 'Joining...';
   peerConnection = createPeer();
   peerConnection.ondatachannel = e => {
     dataChannel = e.channel;

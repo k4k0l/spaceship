@@ -1469,6 +1469,7 @@ class Game {
       } else {
         ch.onopen = sendInit;
       }
+      ch.onclose = () => { this.setStatus('Disconnected'); };
       ch.onmessage = e => {
         try {
           const msg = JSON.parse(e.data);

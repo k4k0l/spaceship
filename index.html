@@ -28,8 +28,21 @@
     #menu { background: rgba(0,0,0,0.8); overflow: hidden; }
     #menuStars { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
     #menu button { position: relative; z-index: 1; }
+    .hidden { display: none; }
     .screen.hidden { display: none; }
     #mobileControls.hidden { display: none; }
+    #swipeHandle {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      width: 20px;
+      right: 0;
+      background: rgba(255,255,255,0.2);
+      z-index: 150;
+      display: none;
+      pointer-events: none;
+    }
+    #swipeHandle.active { display: block; }
     #mobileControls { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; pointer-events: auto; }
     #joystick {
       position: absolute;
@@ -82,6 +95,7 @@
     <div id="joystick"><div id="stick"></div></div>
   </div>
   </div>
+  <div id="swipeHandle" class="hidden"></div>
 
   <div id="shareOverlay" class="screen hidden">
     <h2>Share Link</h2>
