@@ -95,8 +95,15 @@ class Game {
     this.rotateStart = 0;
     this.rotateTarget = 0;
 
-    window.addEventListener('keydown', e => { this.keys[e.keyCode] = true; });
-    window.addEventListener('keyup', e => { this.keys[e.keyCode] = false; });
+    const getKey = Game.keyFromEvent;
+    window.addEventListener('keydown', e => {
+      const code = getKey(e);
+      if (code != null) this.keys[code] = true;
+    });
+    window.addEventListener('keyup', e => {
+      const code = getKey(e);
+      if (code != null) this.keys[code] = false;
+    });
     window.addEventListener('resize', () => this.resizeCanvas());
     this.resizeCanvas();
     this.createStars();
@@ -1526,6 +1533,28 @@ class Game {
     }
   }
 }
+
+/** Convert a keyboard event to the associated game key code */
+Game.keyFromEvent = function(e) {
+  if (e.code) {
+    const map = {
+      ArrowLeft: Game.KEY_LEFT,
+      ArrowRight: Game.KEY_RIGHT,
+      ArrowUp: Game.KEY_UP,
+      ArrowDown: Game.KEY_DOWN,
+      Space: Game.KEY_SPACE,
+      Enter: Game.KEY_ENTER,
+      KeyA: Game.KEY_A,
+      KeyD: Game.KEY_D,
+      KeyW: Game.KEY_W,
+      KeyS: Game.KEY_S,
+      KeyQ: Game.KEY_Q,
+      KeyE: Game.KEY_E
+    };
+    if (map.hasOwnProperty(e.code)) return map[e.code];
+  }
+  return e.keyCode;
+};
 
 // Game constants
 Game.KEY_LEFT = 37;
