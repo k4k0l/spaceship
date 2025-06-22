@@ -428,6 +428,27 @@ class Game {
     this.rotateAnim = this.rotateDuration;
   }
 
+  /** Fire a bullet immediately at the given angle */
+  fireBullet(angle) {
+    if (!this.ship.canShoot) return;
+    const laser = this.laserTimer > 0;
+    this.bullets.push({
+      x: this.ship.x + Math.cos(angle) * this.ship.radius,
+      y: this.ship.y + Math.sin(angle) * this.ship.radius,
+      dx: Math.cos(angle) * 5 + this.ship.thrust.x,
+      dy: Math.sin(angle) * 5 + this.ship.thrust.y,
+      life: laser ? Game.BULLET_LIFE * 2 : Game.BULLET_LIFE,
+      laser,
+      angle
+    });
+    if (window.playSound) window.playSound('shoot', this.ship.x, this.ship.y);
+    if (!laser) {
+      this.ship.thrust.x -= Math.cos(angle) * 5 * Game.BULLET_MASS / this.ship.mass * 0.5;
+      this.ship.thrust.y -= Math.sin(angle) * 5 * Game.BULLET_MASS / this.ship.mass * 0.5;
+    }
+    this.ship.canShoot = false;
+  }
+
   /** Spawn lines for asteroid explosion */
   explodeAsteroid(a) {
     for (let i = 0; i < a.points.length; i++) {
@@ -767,8 +788,9 @@ class Game {
       if (this.keys[Game.KEY_UP] || this.keys[Game.KEY_W]) {
         this.ship.thrust.x += Math.cos(this.ship.angle) * 0.035;
         this.ship.thrust.y += Math.sin(this.ship.angle) * 0.035;
-        const exX = this.ship.x - Math.cos(this.ship.angle) * this.ship.radius;
-        const exY = this.ship.y - Math.sin(this.ship.angle) * this.ship.radius;
+        const off = this.ship.radius * Game.EXHAUST_OFFSET;
+        const exX = this.ship.x - Math.cos(this.ship.angle) * off;
+        const exY = this.ship.y - Math.sin(this.ship.angle) * off;
         if (this.exhaustDelay <= 0) {
           this.exhaust.push({ x: exX, y: exY, r: 2, life: Game.EXHAUST_LIFE, color: this.ship.color, type: 'back' });
           this.exhaustDelay = 0.1;
@@ -777,8 +799,9 @@ class Game {
       if (this.keys[Game.KEY_DOWN] || this.keys[Game.KEY_S]) {
         this.ship.thrust.x -= Math.cos(this.ship.angle) * 0.0175;
         this.ship.thrust.y -= Math.sin(this.ship.angle) * 0.0175;
-        const exX = this.ship.x + Math.cos(this.ship.angle) * this.ship.radius;
-        const exY = this.ship.y + Math.sin(this.ship.angle) * this.ship.radius;
+        const off = this.ship.radius * Game.EXHAUST_OFFSET;
+        const exX = this.ship.x + Math.cos(this.ship.angle) * off;
+        const exY = this.ship.y + Math.sin(this.ship.angle) * off;
         if (this.exhaustDelay <= 0) {
           this.exhaust.push({ x: exX, y: exY, r: 1, life: Game.EXHAUST_LIFE, color: this.ship.color, type: 'front' });
           this.exhaustDelay = 0.15;
@@ -787,8 +810,9 @@ class Game {
       if (this.keys[Game.KEY_Q]) {
         this.ship.thrust.x += Math.sin(this.ship.angle) * 0.0175;
         this.ship.thrust.y += -Math.cos(this.ship.angle) * 0.0175;
-        const exX = this.ship.x + Math.sin(this.ship.angle) * this.ship.radius;
-        const exY = this.ship.y - Math.cos(this.ship.angle) * this.ship.radius;
+        const off = this.ship.radius * Game.EXHAUST_OFFSET;
+        const exX = this.ship.x + Math.sin(this.ship.angle) * off;
+        const exY = this.ship.y - Math.cos(this.ship.angle) * off;
         if (this.exhaustDelay <= 0) {
           this.exhaust.push({ x: exX, y: exY, r: 1, life: Game.EXHAUST_LIFE, color: this.ship.color, type: 'side' });
           this.exhaustDelay = 0.1;
@@ -797,8 +821,9 @@ class Game {
       if (this.keys[Game.KEY_E]) {
         this.ship.thrust.x += -Math.sin(this.ship.angle) * 0.0175;
         this.ship.thrust.y += Math.cos(this.ship.angle) * 0.0175;
-        const exX = this.ship.x - Math.sin(this.ship.angle) * this.ship.radius;
-        const exY = this.ship.y + Math.cos(this.ship.angle) * this.ship.radius;
+        const off = this.ship.radius * Game.EXHAUST_OFFSET;
+        const exX = this.ship.x - Math.sin(this.ship.angle) * off;
+        const exY = this.ship.y + Math.cos(this.ship.angle) * off;
         if (this.exhaustDelay <= 0) {
           this.exhaust.push({ x: exX, y: exY, r: 1, life: Game.EXHAUST_LIFE, color: this.ship.color, type: 'side' });
           this.exhaustDelay = 0.1;
@@ -853,22 +878,7 @@ class Game {
         this.ship.thrust.y *= Game.SHIP_DRAG;
       }
       if (this.keys[Game.KEY_SPACE] && this.ship.canShoot) {
-        const laser = this.laserTimer > 0;
-        this.bullets.push({
-          x: this.ship.x + Math.cos(this.ship.angle) * this.ship.radius,
-          y: this.ship.y + Math.sin(this.ship.angle) * this.ship.radius,
-          dx: Math.cos(this.ship.angle) * 5 + this.ship.thrust.x,
-          dy: Math.sin(this.ship.angle) * 5 + this.ship.thrust.y,
-          life: laser ? Game.BULLET_LIFE * 2 : Game.BULLET_LIFE,
-          laser,
-          angle: this.ship.angle
-        });
-        if (window.playSound) window.playSound('shoot', this.ship.x, this.ship.y);
-        if (!laser) {
-          this.ship.thrust.x -= Math.cos(this.ship.angle) * 5 * Game.BULLET_MASS / this.ship.mass * 0.5;
-          this.ship.thrust.y -= Math.sin(this.ship.angle) * 5 * Game.BULLET_MASS / this.ship.mass * 0.5;
-        }
-        this.ship.canShoot = false;
+        this.fireBullet(this.ship.angle);
       }
       if (!this.keys[Game.KEY_SPACE]) this.ship.canShoot = true;
     }
@@ -1576,6 +1586,7 @@ Game.SHIELD_DURATION = 30;
 Game.LASER_DURATION = 60;
 Game.PICKUP_SIZE = Game.DEFAULT_SHIP_RADIUS * 2;
 Game.EXHAUST_LIFE = 0.7;
+Game.EXHAUST_OFFSET = 1.1; // relative to ship radius
 Game.ROUND_TIME = 150;
 Game.MIN_ASTEROID_RADIUS = 15;
 Game.WORLD_SIZE = 3000;
