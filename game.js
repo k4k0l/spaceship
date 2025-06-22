@@ -72,6 +72,7 @@ class Game {
 
     this.viewportX = 0;
     this.viewportY = 0;
+    this.isoScale = Game.ISO_SCALE;
 
     const startAngle = Math.random() * Math.PI * 2;
     this.ship = {
@@ -170,10 +171,25 @@ class Game {
 
   /** Check if world coordinates are visible on screen */
   isOnScreen(x, y, margin = 0) {
-    const sx = (x - this.viewportX + this.worldWidth) % this.worldWidth;
-    const sy = (y - this.viewportY + this.worldHeight) % this.worldHeight;
-    return sx >= -margin && sx <= this.canvas.width + margin &&
-           sy >= -margin && sy <= this.canvas.height + margin;
+    const pos = this.isoTransform(x, y);
+    return pos.x >= -margin && pos.x <= this.canvas.width + margin &&
+           pos.y >= -margin && pos.y <= this.canvas.height + margin;
+  }
+
+  /** Convert world coordinates to isometric screen coordinates */
+  isoTransform(x, y) {
+    let dx = x - this.ship.x;
+    let dy = y - this.ship.y;
+    if (dx > this.worldWidth / 2) dx -= this.worldWidth;
+    if (dx < -this.worldWidth / 2) dx += this.worldWidth;
+    if (dy > this.worldHeight / 2) dy -= this.worldHeight;
+    if (dy < -this.worldHeight / 2) dy += this.worldHeight;
+    const ix = dx - dy;
+    const iy = (dx + dy) * this.isoScale;
+    return {
+      x: ix + this.canvas.width / 2,
+      y: iy + this.canvas.height / 2
+    };
   }
 
   getWorldState() {
@@ -521,11 +537,13 @@ class Game {
     if (!isFinite(x) || !isFinite(y)) return;
     for (let ox = -1; ox <= 1; ox++) {
       for (let oy = -1; oy <= 1; oy++) {
-        const nx = x + ox * this.worldWidth - this.viewportX;
-        const ny = y + oy * this.worldHeight - this.viewportY;
-        if (nx + r < 0 || nx - r > this.canvas.width || ny + r < 0 || ny - r > this.canvas.height) continue;
+        const wx = x + ox * this.worldWidth;
+        const wy = y + oy * this.worldHeight;
+        const pos = this.isoTransform(wx, wy);
+        const base = this.isoTransform(x, y);
+        if (pos.x + r < 0 || pos.x - r > this.canvas.width || pos.y + r < 0 || pos.y - r > this.canvas.height) continue;
         this.ctx.save();
-        this.ctx.translate(nx - x, ny - y);
+        this.ctx.translate(pos.x - base.x, pos.y - base.y);
         fn();
         this.ctx.restore();
       }
@@ -539,17 +557,28 @@ class Game {
       layer.forEach(s => {
         const x = s.x - this.viewportX * s.factor;
         const y = s.y - this.viewportY * s.factor;
-        const sx = ((x % this.worldWidth) + this.worldWidth) % this.worldWidth - this.viewportX;
-        const sy = ((y % this.worldHeight) + this.worldHeight) % this.worldHeight - this.viewportY;
-        if (sx < 0 || sx > this.canvas.width || sy < 0 || sy > this.canvas.height) return;
+        const sx = ((x % this.worldWidth) + this.worldWidth) % this.worldWidth;
+        const sy = ((y % this.worldHeight) + this.worldHeight) % this.worldHeight;
+        const pos = this.isoTransform(sx, sy);
+        if (pos.x < 0 || pos.x > this.canvas.width || pos.y < 0 || pos.y > this.canvas.height) return;
         this.ctx.fillStyle = s.color;
-        this.ctx.fillRect(sx, sy, s.size, s.size);
+        this.ctx.fillRect(pos.x, pos.y, s.size, s.size);
       });
     }
 
     // draw board edges
     this.ctx.strokeStyle = '#fff';
-    this.ctx.strokeRect(-this.viewportX, -this.viewportY, this.worldWidth, this.worldHeight);
+    const tl = this.isoTransform(0, 0);
+    const tr = this.isoTransform(this.worldWidth, 0);
+    const bl = this.isoTransform(0, this.worldHeight);
+    const br = this.isoTransform(this.worldWidth, this.worldHeight);
+    this.ctx.beginPath();
+    this.ctx.moveTo(tl.x, tl.y);
+    this.ctx.lineTo(tr.x, tr.y);
+    this.ctx.lineTo(br.x, br.y);
+    this.ctx.lineTo(bl.x, bl.y);
+    this.ctx.closePath();
+    this.ctx.stroke();
   }
 
   drawPlanets() {
@@ -1547,5 +1576,6 @@ Game.ENEMY_ACCEL = 0.025;
 Game.ENEMY_DETECTION_RADIUS = 600;
 Game.ENEMY_HP = 1;
 Game.PALETTE = ['#fff', '#0ff', '#f0f', '#ff0', '#0f0', '#f00', '#00f', '#f80'];
+Game.ISO_SCALE = 0.5;
 
 window.Game = Game;
