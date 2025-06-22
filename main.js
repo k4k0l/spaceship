@@ -362,8 +362,7 @@ if (isMobile) {
         const wy = game.viewportY + (lastTapY - rect.top);
         const angle = Math.atan2(wy - game.ship.y, wx - game.ship.x);
         game.rotateTo(angle, Game.FAST_ROTATE_DURATION);
-        game.keys[Game.KEY_SPACE] = true;
-        setTimeout(() => { if (game) game.keys[Game.KEY_SPACE] = false; }, 100);
+        game.fireBullet(angle);
       }
     } else {
       joystick.classList.remove('active');
