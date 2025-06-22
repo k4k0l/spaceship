@@ -540,10 +540,9 @@ class Game {
         const wx = x + ox * this.worldWidth;
         const wy = y + oy * this.worldHeight;
         const pos = this.isoTransform(wx, wy);
-        const base = this.isoTransform(x, y);
         if (pos.x + r < 0 || pos.x - r > this.canvas.width || pos.y + r < 0 || pos.y - r > this.canvas.height) continue;
         this.ctx.save();
-        this.ctx.translate(pos.x - base.x, pos.y - base.y);
+        this.ctx.translate(pos.x - x, pos.y - y);
         fn();
         this.ctx.restore();
       }
