@@ -199,6 +199,52 @@ class Game {
     };
   }
 
+  shipVertices() {
+    const r = this.ship.radius;
+    const a = this.ship.angle;
+    const nose = {
+      x: this.ship.x + Math.cos(a) * r,
+      y: this.ship.y + Math.sin(a) * r
+    };
+    const left = {
+      x: this.ship.x - Math.cos(a) * r + Math.sin(a) * (r / 2),
+      y: this.ship.y - Math.sin(a) * r - Math.cos(a) * (r / 2)
+    };
+    const right = {
+      x: this.ship.x - Math.cos(a) * r - Math.sin(a) * (r / 2),
+      y: this.ship.y - Math.sin(a) * r + Math.cos(a) * (r / 2)
+    };
+    return [nose, left, right];
+  }
+
+  pointInShip(px, py) {
+    const [A, B, C] = this.shipVertices();
+    const v0x = C.x - A.x, v0y = C.y - A.y;
+    const v1x = B.x - A.x, v1y = B.y - A.y;
+    const v2x = px - A.x, v2y = py - A.y;
+    const dot00 = v0x * v0x + v0y * v0y;
+    const dot01 = v0x * v1x + v0y * v1y;
+    const dot02 = v0x * v2x + v0y * v2y;
+    const dot11 = v1x * v1x + v1y * v1y;
+    const dot12 = v1x * v2x + v1y * v2y;
+    const inv = 1 / (dot00 * dot11 - dot01 * dot01);
+    const u = (dot11 * dot02 - dot01 * dot12) * inv;
+    const v = (dot00 * dot12 - dot01 * dot02) * inv;
+    return u >= 0 && v >= 0 && (u + v <= 1);
+  }
+
+  shipCircleCollision(obj) {
+    const verts = this.shipVertices();
+    for (let i = 0; i < 3; i++) {
+      const v1 = verts[i];
+      const v2 = verts[(i + 1) % 3];
+      if (Game.segCircleIntersect(v1.x, v1.y, v2.x, v2.y, obj.x, obj.y, obj.radius)) {
+        return true;
+      }
+    }
+    return this.pointInShip(obj.x, obj.y);
+  }
+
   getWorldState() {
     return JSON.parse(JSON.stringify({
       worldWidth: this.worldWidth,
@@ -579,6 +625,7 @@ class Game {
 
   /** Draw parallax star background */
   drawBackground() {
+    const speed = Math.hypot(this.ship.thrust.x, this.ship.thrust.y);
     for (let i = 0; i < this.stars.length; i++) {
       const layer = this.stars[i];
       layer.forEach(s => {
@@ -588,8 +635,14 @@ class Game {
         const sy = ((y % this.worldHeight) + this.worldHeight) % this.worldHeight;
         const pos = this.isoTransform(sx, sy);
         if (pos.x < 0 || pos.x > this.canvas.width || pos.y < 0 || pos.y > this.canvas.height) return;
-        this.ctx.fillStyle = s.color;
-        this.ctx.fillRect(pos.x, pos.y, s.size, s.size);
+        const blur = speed * 10 * s.factor;
+        const bx = pos.x - this.ship.thrust.x * blur;
+        const by = pos.y - this.ship.thrust.y * blur;
+        this.ctx.strokeStyle = s.color;
+        this.ctx.beginPath();
+        this.ctx.moveTo(pos.x, pos.y);
+        this.ctx.lineTo(bx, by);
+        this.ctx.stroke();
       });
     }
 
@@ -786,44 +839,56 @@ class Game {
         this.ship.angle = this.rotateStart + (this.rotateTarget - this.rotateStart) * t;
       }
       if (this.keys[Game.KEY_UP] || this.keys[Game.KEY_W]) {
-        this.ship.thrust.x += Math.cos(this.ship.angle) * 0.035;
-        this.ship.thrust.y += Math.sin(this.ship.angle) * 0.035;
+        const ax = Math.cos(this.ship.angle) * 0.035;
+        const ay = Math.sin(this.ship.angle) * 0.035;
+        this.ship.thrust.x += ax;
+        this.ship.thrust.y += ay;
         const off = this.ship.radius * Game.EXHAUST_OFFSET;
-        const exX = this.ship.x - Math.cos(this.ship.angle) * off;
-        const exY = this.ship.y - Math.sin(this.ship.angle) * off;
+        const mag = Math.hypot(ax, ay) || 1;
+        const exX = this.ship.x - ax / mag * off;
+        const exY = this.ship.y - ay / mag * off;
         if (this.exhaustDelay <= 0) {
           this.exhaust.push({ x: exX, y: exY, r: 2, life: Game.EXHAUST_LIFE, color: this.ship.color, type: 'back' });
           this.exhaustDelay = 0.1;
         }
       }
       if (this.keys[Game.KEY_DOWN] || this.keys[Game.KEY_S]) {
-        this.ship.thrust.x -= Math.cos(this.ship.angle) * 0.0175;
-        this.ship.thrust.y -= Math.sin(this.ship.angle) * 0.0175;
+        const ax = -Math.cos(this.ship.angle) * 0.0175;
+        const ay = -Math.sin(this.ship.angle) * 0.0175;
+        this.ship.thrust.x += ax;
+        this.ship.thrust.y += ay;
         const off = this.ship.radius * Game.EXHAUST_OFFSET;
-        const exX = this.ship.x + Math.cos(this.ship.angle) * off;
-        const exY = this.ship.y + Math.sin(this.ship.angle) * off;
+        const mag = Math.hypot(ax, ay) || 1;
+        const exX = this.ship.x - ax / mag * off;
+        const exY = this.ship.y - ay / mag * off;
         if (this.exhaustDelay <= 0) {
           this.exhaust.push({ x: exX, y: exY, r: 1, life: Game.EXHAUST_LIFE, color: this.ship.color, type: 'front' });
           this.exhaustDelay = 0.15;
         }
       }
       if (this.keys[Game.KEY_Q]) {
-        this.ship.thrust.x += Math.sin(this.ship.angle) * 0.0175;
-        this.ship.thrust.y += -Math.cos(this.ship.angle) * 0.0175;
+        const ax = Math.sin(this.ship.angle) * 0.0175;
+        const ay = -Math.cos(this.ship.angle) * 0.0175;
+        this.ship.thrust.x += ax;
+        this.ship.thrust.y += ay;
         const off = this.ship.radius * Game.EXHAUST_OFFSET;
-        const exX = this.ship.x + Math.sin(this.ship.angle) * off;
-        const exY = this.ship.y - Math.cos(this.ship.angle) * off;
+        const mag = Math.hypot(ax, ay) || 1;
+        const exX = this.ship.x - ax / mag * off;
+        const exY = this.ship.y - ay / mag * off;
         if (this.exhaustDelay <= 0) {
           this.exhaust.push({ x: exX, y: exY, r: 1, life: Game.EXHAUST_LIFE, color: this.ship.color, type: 'side' });
           this.exhaustDelay = 0.1;
         }
       }
       if (this.keys[Game.KEY_E]) {
-        this.ship.thrust.x += -Math.sin(this.ship.angle) * 0.0175;
-        this.ship.thrust.y += Math.cos(this.ship.angle) * 0.0175;
+        const ax = -Math.sin(this.ship.angle) * 0.0175;
+        const ay = Math.cos(this.ship.angle) * 0.0175;
+        this.ship.thrust.x += ax;
+        this.ship.thrust.y += ay;
         const off = this.ship.radius * Game.EXHAUST_OFFSET;
-        const exX = this.ship.x - Math.sin(this.ship.angle) * off;
-        const exY = this.ship.y + Math.cos(this.ship.angle) * off;
+        const mag = Math.hypot(ax, ay) || 1;
+        const exX = this.ship.x - ax / mag * off;
+        const exY = this.ship.y - ay / mag * off;
         if (this.exhaustDelay <= 0) {
           this.exhaust.push({ x: exX, y: exY, r: 1, life: Game.EXHAUST_LIFE, color: this.ship.color, type: 'side' });
           this.exhaustDelay = 0.1;
@@ -913,7 +978,7 @@ class Game {
       b.x = (b.x + b.dx + this.worldWidth) % this.worldWidth;
       b.y = (b.y + b.dy + this.worldHeight) % this.worldHeight;
       b.life -= dt;
-      if (!this.ship.dead && Math.hypot(b.x - this.ship.x, b.y - this.ship.y) < this.ship.radius) {
+      if (!this.ship.dead && this.pointInShip(b.x, b.y)) {
         this.bullets.splice(bi, 1);
         if (this.shieldTimer > 0) {
           this.spawnParticles(b.x, b.y, 5, '#ff0');
@@ -1033,7 +1098,7 @@ class Game {
     }
 
     this.asteroids.forEach((a, ai) => {
-      if (!this.ship.dead && Math.hypot(this.ship.x - a.x, this.ship.y - a.y) < this.ship.radius + a.radius) {
+      if (!this.ship.dead && this.shipCircleCollision({ x: a.x, y: a.y, radius: a.radius })) {
         const ang = Math.atan2(a.y - this.ship.y, a.x - this.ship.x);
         const force = 0.5;
         this.ship.thrust.x -= Math.cos(ang) * force * a.mass / this.ship.mass;
@@ -1061,7 +1126,7 @@ class Game {
     });
 
     this.planets.forEach(pl => {
-      if (!this.ship.dead && Math.hypot(this.ship.x - pl.x, this.ship.y - pl.y) < this.ship.radius + pl.radius) {
+      if (!this.ship.dead && this.shipCircleCollision({ x: pl.x, y: pl.y, radius: pl.radius })) {
         pl.shake = Math.max(pl.shake, Math.min(1, this.ship.mass / pl.mass));
         if (this.shieldTimer > 0) {
           const ang = Math.atan2(this.ship.y - pl.y, this.ship.x - pl.x);
@@ -1178,7 +1243,7 @@ class Game {
           }
         }
       });
-      if (!this.ship.dead && Math.hypot(p.x - this.ship.x, p.y - this.ship.y) < p.size + this.ship.radius) {
+      if (!this.ship.dead && this.shipCircleCollision({ x: p.x, y: p.y, radius: p.size })) {
         this.spawnParticles(p.x, p.y, 50, p.color, 2);
         this.pickups.splice(pi, 1);
         if (window.playSound) window.playSound('pickup', this.ship.x, this.ship.y);
@@ -1219,7 +1284,7 @@ class Game {
         const d = Math.hypot(dx, dy) || 1;
         e.dx += (dx / d) * Game.ENEMY_ACCEL;
         e.dy += (dy / d) * Game.ENEMY_ACCEL;
-        if (distToShip < this.ship.radius + Game.ENEMY_RADIUS) {
+        if (this.shipCircleCollision({ x: e.x, y: e.y, radius: Game.ENEMY_RADIUS })) {
           if (this.spawnInvul <= 0) {
             this.armor -= 1; this.lineFlashTimer = 1.5; this.updateTopbar();
             if (this.armor <= 0) this.explodeShip();
@@ -1564,6 +1629,22 @@ Game.keyFromEvent = function(e) {
     if (map.hasOwnProperty(e.code)) return map[e.code];
   }
   return e.keyCode;
+};
+
+Game.segCircleIntersect = function(x1, y1, x2, y2, cx, cy, r) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const fx = x1 - cx;
+  const fy = y1 - cy;
+  const a = dx * dx + dy * dy;
+  const b = 2 * (fx * dx + fy * dy);
+  const c = fx * fx + fy * fy - r * r;
+  let disc = b * b - 4 * a * c;
+  if (disc < 0) return false;
+  disc = Math.sqrt(disc);
+  const t1 = (-b - disc) / (2 * a);
+  const t2 = (-b + disc) / (2 * a);
+  return (t1 >= 0 && t1 <= 1) || (t2 >= 0 && t2 <= 1);
 };
 
 // Game constants

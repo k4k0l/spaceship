@@ -389,6 +389,17 @@ window.addEventListener('keydown', e => {
   }
 });
 
+// Desktop click to aim and fire
+canvas.addEventListener('click', e => {
+  if (!game) return;
+  const rect = canvas.getBoundingClientRect();
+  const wx = game.viewportX + (e.clientX - rect.left);
+  const wy = game.viewportY + (e.clientY - rect.top);
+  const angle = Math.atan2(wy - game.ship.y, wx - game.ship.x);
+  game.rotateTo(angle, Game.FAST_ROTATE_DURATION);
+  game.fireBullet(angle);
+});
+
 
 let swipeActive = false;
 let swipeStartX = 0;
