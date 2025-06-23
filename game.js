@@ -208,6 +208,21 @@ class Game {
     return Math.atan2(iy, ix);
   }
 
+  /** Convert a screen delta in pixels to world delta */
+  screenDeltaToWorld(dx, dy) {
+    const wx = (dx + dy / this.isoScale) / 2;
+    const wy = (dy / this.isoScale - dx) / 2;
+    return { x: wx, y: wy };
+  }
+
+  /** Calculate world angle from screen coordinates */
+  screenAngle(sx, sy) {
+    const dx = sx - this.canvas.width / 2;
+    const dy = sy - this.canvas.height / 2;
+    const v = this.screenDeltaToWorld(dx, dy);
+    return Math.atan2(v.y, v.x);
+  }
+
   shipVertices() {
     const r = this.ship.radius;
     const a = this.ship.angle;
