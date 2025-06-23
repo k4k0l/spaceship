@@ -283,7 +283,10 @@ if (isMobile) {
     if (!game) return;
     const thr = 10;
     const dist = Math.hypot(dx, dy);
-    if (dist > 0) game.ship.angle = Math.atan2(dy, dx);
+    if (dist > 0) {
+      const vec = game.screenDeltaToWorld(dx, dy);
+      game.ship.angle = Math.atan2(vec.y, vec.x);
+    }
     game.keys[Game.KEY_UP] = dist > thr;
   }
 
@@ -358,9 +361,9 @@ if (isMobile) {
     if (touchId === null) {
       if (!longPress && game) {
         const rect = canvas.getBoundingClientRect();
-        const wx = game.viewportX + (lastTapX - rect.left);
-        const wy = game.viewportY + (lastTapY - rect.top);
-        const angle = Math.atan2(wy - game.ship.y, wx - game.ship.x);
+        const sx = lastTapX - rect.left;
+        const sy = lastTapY - rect.top;
+        const angle = game.screenAngle(sx, sy);
         game.rotateTo(angle, 0);
         game.fireBullet(angle);
       }
@@ -393,9 +396,9 @@ window.addEventListener('keydown', e => {
 canvas.addEventListener('click', e => {
   if (!game) return;
   const rect = canvas.getBoundingClientRect();
-  const wx = game.viewportX + (e.clientX - rect.left);
-  const wy = game.viewportY + (e.clientY - rect.top);
-  const angle = Math.atan2(wy - game.ship.y, wx - game.ship.x);
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const angle = game.screenAngle(sx, sy);
   game.rotateTo(angle, 0);
   game.fireBullet(angle);
 });
