@@ -1,6 +1,6 @@
 
 const GAME_NAME = 'Asteroids';
-const GAME_VERSION = '0.1.2';
+const GAME_VERSION = '0.2.1';
 
 const canvas = document.getElementById('game');
 const mapCanvas = document.getElementById('minimap');

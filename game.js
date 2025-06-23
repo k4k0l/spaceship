@@ -199,6 +199,15 @@ class Game {
     };
   }
 
+  /** Convert a world angle to an isometric screen angle */
+  isoAngle(angle) {
+    const dx = Math.cos(angle);
+    const dy = Math.sin(angle);
+    const ix = dx - dy;
+    const iy = (dx + dy) * this.isoScale;
+    return Math.atan2(iy, ix);
+  }
+
   shipVertices() {
     const r = this.ship.radius;
     const a = this.ship.angle;
@@ -1427,7 +1436,7 @@ class Game {
         this.drawWrapped(this.ship.x, this.ship.y, this.ship.radius, () => {
           ctx.save();
           ctx.translate(this.ship.x, this.ship.y);
-          ctx.rotate(this.ship.angle);
+          ctx.rotate(this.isoAngle(this.ship.angle));
           ctx.beginPath();
           ctx.moveTo(this.ship.radius, 0);
           ctx.lineTo(-this.ship.radius, this.ship.radius / 2);
@@ -1453,7 +1462,7 @@ class Game {
         this.drawWrapped(f.x, f.y, 0, () => {
           ctx.save();
           ctx.translate(f.x, f.y);
-          ctx.rotate(f.rot);
+          ctx.rotate(this.isoAngle(f.rot));
           ctx.beginPath();
           ctx.moveTo(f.x1, f.y1);
           ctx.lineTo(f.x2, f.y2);
@@ -1468,7 +1477,7 @@ class Game {
       this.drawWrapped(this.peerShip.x, this.peerShip.y, this.peerShip.radius, () => {
         ctx.save();
         ctx.translate(this.peerShip.x, this.peerShip.y);
-        ctx.rotate(this.peerShip.angle);
+        ctx.rotate(this.isoAngle(this.peerShip.angle));
         ctx.beginPath();
         ctx.moveTo(this.peerShip.radius, 0);
         ctx.lineTo(-this.peerShip.radius, this.peerShip.radius / 2);
@@ -1485,10 +1494,14 @@ class Game {
       if (b.laser) {
         ctx.strokeStyle = '#0ff';
         this.drawWrapped(b.x, b.y, 20, () => {
+          ctx.save();
+          ctx.translate(b.x, b.y);
+          ctx.rotate(this.isoAngle(b.angle));
           ctx.beginPath();
-          ctx.moveTo(b.x, b.y);
-          ctx.lineTo(b.x + Math.cos(b.angle) * 20, b.y + Math.sin(b.angle) * 20);
+          ctx.moveTo(0, 0);
+          ctx.lineTo(20, 0);
           ctx.stroke();
+          ctx.restore();
         });
       } else {
         ctx.fillStyle = 'white';
@@ -1526,7 +1539,7 @@ class Game {
       ctx.save();
       this.drawWrapped(e.x, e.y, Game.ENEMY_RADIUS + 2, () => {
         ctx.translate(e.x, e.y);
-        ctx.rotate(e.angle + Math.PI / 2);
+        ctx.rotate(this.isoAngle(e.angle) + Math.PI / 2);
         ctx.font = Game.ENEMY_FONT_SIZE + 'px serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
