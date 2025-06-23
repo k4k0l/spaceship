@@ -361,7 +361,7 @@ if (isMobile) {
         const wx = game.viewportX + (lastTapX - rect.left);
         const wy = game.viewportY + (lastTapY - rect.top);
         const angle = Math.atan2(wy - game.ship.y, wx - game.ship.x);
-        game.rotateTo(angle, Game.FAST_ROTATE_DURATION);
+        game.rotateTo(angle, 0);
         game.fireBullet(angle);
       }
     } else {
@@ -396,7 +396,7 @@ canvas.addEventListener('click', e => {
   const wx = game.viewportX + (e.clientX - rect.left);
   const wy = game.viewportY + (e.clientY - rect.top);
   const angle = Math.atan2(wy - game.ship.y, wx - game.ship.x);
-  game.rotateTo(angle, Game.FAST_ROTATE_DURATION);
+  game.rotateTo(angle, 0);
   game.fireBullet(angle);
 });
 

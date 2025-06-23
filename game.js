@@ -466,6 +466,14 @@ class Game {
 
   /** Rotate ship smoothly towards specified angle */
   rotateTo(angle, duration = Game.DEFAULT_ROTATE_DURATION) {
+    if (duration <= 0) {
+      this.ship.angle = angle;
+      this.rotateDuration = 0;
+      this.rotateAnim = 0;
+      this.rotateStart = angle;
+      this.rotateTarget = angle;
+      return;
+    }
     this.rotateDuration = duration;
     this.rotateStart = this.ship.angle;
     this.rotateTarget = angle;
@@ -1667,7 +1675,7 @@ Game.SHIELD_DURATION = 30;
 Game.LASER_DURATION = 60;
 Game.PICKUP_SIZE = Game.DEFAULT_SHIP_RADIUS * 2;
 Game.EXHAUST_LIFE = 0.7;
-Game.EXHAUST_OFFSET = 1.1; // relative to ship radius
+Game.EXHAUST_OFFSET = 1; // relative to ship radius
 Game.ROUND_TIME = 150;
 Game.MIN_ASTEROID_RADIUS = 15;
 Game.WORLD_SIZE = 3000;
