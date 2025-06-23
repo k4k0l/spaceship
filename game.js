@@ -78,7 +78,7 @@ class Game {
     this.ship = {
       x: this.worldWidth / 2,
       y: this.worldHeight / 2,
-      angle: 0,
+      angle: startAngle,
       radius: Game.DEFAULT_SHIP_RADIUS,
       mass: Game.DEFAULT_SHIP_MASS,
       thrust: {
@@ -573,8 +573,8 @@ class Game {
     this.shieldTimer = 0;
     this.ship.x = this.worldWidth / 2;
     this.ship.y = this.worldHeight / 2;
-    this.ship.angle = 0;
     const ang = Math.random() * Math.PI * 2;
+    this.ship.angle = ang;
     this.ship.thrust.x = Math.cos(ang) * 0.5;
     this.ship.thrust.y = Math.sin(ang) * 0.5;
     this.shipFragments = [];
@@ -598,8 +598,8 @@ class Game {
     this.shieldTimer = 0;
     this.ship.x = this.worldWidth / 2;
     this.ship.y = this.worldHeight / 2;
-    this.ship.angle = 0;
     const ang = Math.random() * Math.PI * 2;
+    this.ship.angle = ang;
     this.ship.thrust.x = Math.cos(ang) * 0.5;
     this.ship.thrust.y = Math.sin(ang) * 0.5;
     this.armor = 5;
@@ -1689,7 +1689,8 @@ Game.GRAVITY_MULT = 0.5;
 Game.PLANET_GRAVITY_MULT = 8;
 Game.GRAVITY_RANGE_FACTOR = 10.5;
 Game.SHIP_ACCEL = 0.035;
-Game.SHIP_DRAG = 0.98;
+// disable passive slowdown; ship will maintain velocity until counter-thrust
+Game.SHIP_DRAG = 1;
 Game.DEFAULT_ROTATE_DURATION = 0.15;
 Game.FAST_ROTATE_DURATION = 0.05;
 // warn about strong gravity sooner
