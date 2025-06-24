@@ -1,6 +1,7 @@
 
 const GAME_NAME = 'Asteroids';
-const GAME_VERSION = '0.2.1';
+const GAME_VERSION = '0.3.1';
+const SIGNALING_URL = 'https://script.google.com/macros/s/AKfycbxmbFlb8ntvxlYGe9-NV-75eEVvpMhU9CxdwW3DYX18KZsRgFSH3gYBp9qjBGwFCMKu/exec';
 
 const canvas = document.getElementById('game');
 const mapCanvas = document.getElementById('minimap');
@@ -67,6 +68,8 @@ let settingsData = '';
 let isHost = false;
 let pendingStatus = '';
 let introPlayed = false;
+let currentRoomId = '';
+let pollInterval = null;
 const midiUrl = 'data:audio/midi;base64,TVRoZAAAAAYAAQAGAYBNVHJrAAAAGgD/WAQEAmAIAP9/AwAAQQD/UQMJiWgA/y8ATVRyawAAANoA/wMAALEAAADBUACxCj8A/1kCAAAAsQd/AJFDZIIggUMAAJFFZIFAgUUAAJFIZGCBSAAAkUdkgiCBRwAAkUNkgiCBQwAAkUhkgiCBSAAAkUpkgUCBSgAAkU1kYIFNAACRTGSCIIFMAACRSmSCIIFKAACRS2SCIIFLAACRSmSBQIFKAACRSGRggUgAAJFGZIIggUYAAJFLZIIggUsAAJFSZIIggVIAAJFPZIFAgU8AAJFLZGCBSwAAkUpkgiCBSgAAkU9kgUCBTwAAkUxkYLEHAIMAgUwAAP8vAE1UcmsAAAFAAP8DAACyAAAAwlAAsgo/AP9ZAgAAALIHfwCSTGSBQIJMAACSQ2RggkMAAJJKZIFAgkoAAJJFZGCCRQAAkkhkgUCCSAAAkkNkYIJDAACSRWSBQIJFAACSSGRggkgAAJJMZIFAgkwAAJJDZGCCQwAAkkpkgUCCSgAAkkVkYIJFAACSSGSBQIJIAACSQ2RggkMAAJJIZIFAgkgAAJJPZGCCTwAAklBkgUCCUAAAkk9kYIJPAACSTWSBQIJNAACSS2RggksAAJJKZIFAgkoAAJJIZGCCSAAAkkZkgUCCRgAAkkpkYIJKAACSS2SBQIJLAACSTWRggk0AAJJLZIFAgksAAJJIZGCCSAAAkk1kYIJNAACSSmRggkoAAJJFZGCCRQAAkkpkYIJKAACSR2RggkcAAJJFZGCyBwCDAIJFAAD/LwBNVHJrAAABQAD/AwAAswAAAMNQALMKPwD/WQIAAACzB38Ak0NkgUCDQwAAk0hkYINIAACTSmSBQINKAACTTWRgg00AAJNMZIFAg0wAAJNIZGCDSAAAk0pkgUCDSgAAk1FkYINRAACTT2SBQINPAACTSGRgg0gAAJNKZIFAg0oAAJNNZGCDTQAAk0xkgUCDTAAAk0hkYINIAACTT2SBQINPAACTU2Rgg1MAAJNUZIFAg1QAAJNSZGCDUgAAk1BkgUCDUAAAk09kYINPAACTTWSBQINNAACTS2Rgg0sAAJNKZIFAg0oAAJNGZGCDRgAAk1JkgUCDUgAAk1RkYINUAACTUmSBQINSAACTT2Rgg08AAJNRZGCDUQAAk01kYINNAACTSmRgg0oAAJNPZGCDTwAAk0xkYINMAACTSmRgswcAgwCDSgAA/y8ATVRyawAAABIA/wMAALQKPwD/WQIAAAD/LwBNVHJrAAAADgD/AwAA/1kCAAAA/y8A';
 
 const defaultSettingsText = `{
@@ -108,20 +111,26 @@ function copyToClipboard(text) {
   }
 }
 
-function showShareOverlay(link, onClose) {
-  shareLink.value = link;
+function showShareOverlay(text, onClose) {
+  shareLink.value = text;
   shareOverlay.classList.remove('hidden');
-  shortenBtn.onclick = async () => {
-    try {
-      const resp = await fetch('https://cleanuri.com/api/v1/shorten', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'url=' + encodeURIComponent(shareLink.value)
-      });
-      const data = await resp.json();
-      if (data.result_url) shareLink.value = data.result_url;
-    } catch {}
-  };
+  if (text.startsWith('http')) {
+    shortenBtn.style.display = '';
+    shortenBtn.onclick = async () => {
+      try {
+        const resp = await fetch('https://cleanuri.com/api/v1/shorten', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'url=' + encodeURIComponent(shareLink.value)
+        });
+        const data = await resp.json();
+        if (data.result_url) shareLink.value = data.result_url;
+      } catch {}
+    };
+  } else {
+    shortenBtn.style.display = 'none';
+    shortenBtn.onclick = null;
+  }
   copyLinkBtn.onclick = () => copyToClipboard(shareLink.value);
   waBtn.onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(shareLink.value), '_blank');
   msgrBtn.onclick = () => window.open('fb-messenger://share?link=' + encodeURIComponent(shareLink.value), '_blank');
@@ -138,6 +147,15 @@ function encodeSession(obj) {
 
 function decodeSession(str) {
   return JSON.parse(LZString.decompressFromEncodedURIComponent(str));
+}
+
+async function getRoomData(roomId) {
+  const resp = await fetch(`${SIGNALING_URL}?room=${roomId}`);
+  return resp.json();
+}
+
+async function updateRoom(data) {
+  await fetch(SIGNALING_URL, { method: 'POST', body: JSON.stringify(data) });
 }
 
 function generateSettingsText(values) {
@@ -609,22 +627,50 @@ async function startHost() {
   await new Promise(res => {
     peerConnection.onicecandidate = e => { if (!e.candidate) res(); };
   });
-  const link = `${location.origin}${location.pathname}?session=${encodeSession({ type: 'offer', sdp: peerConnection.localDescription.sdp })}`;
-  showShareOverlay(link, () => {
-    const ans = prompt('Paste answer link here when ready:');
-    if (ans) handleSessionLink(ans);
-  });
+  currentRoomId = Math.random().toString(36).substring(2, 8);
+  await updateRoom({ RoomID: currentRoomId, Offer: encodeSession({ type: 'offer', sdp: peerConnection.localDescription.sdp }) });
+  showShareOverlay(currentRoomId);
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(async () => {
+    const data = await getRoomData(currentRoomId);
+    if (data.Answer) {
+      clearInterval(pollInterval);
+      try {
+        const ans = decodeSession(data.Answer);
+        await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: ans.sdp }));
+        startGame();
+      } catch (e) { console.error(e); }
+    }
+  }, 2000);
 }
 
 async function startJoin() {
   pingEl.textContent = '(--ms) Joining...';
   pendingStatus = 'Joining...';
-  const link = prompt('Paste host link:');
-  if (!link) return;
-  const url = new URL(link);
-  const session = url.searchParams.get('session');
+  const roomId = prompt('Enter room ID:');
+  if (!roomId) return;
+  await joinWithRoom(roomId.trim());
+}
+
+async function joinWithRoom(roomId) {
+  const info = await getRoomData(roomId);
+  const session = info && info.Offer;
   if (!session) return;
-  await joinWithSession(session);
+  const data = decodeSession(session);
+  if (data.type !== 'offer') return;
+  pendingStatus = 'Joining...';
+  peerConnection = createPeer();
+  peerConnection.ondatachannel = e => {
+    dataChannel = e.channel;
+    dataChannel.onopen = () => { if (game) game.setDataChannel(dataChannel); };
+  };
+  await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: data.sdp }));
+  const answer = await peerConnection.createAnswer();
+  await peerConnection.setLocalDescription(answer);
+  await new Promise(res => { peerConnection.onicecandidate = e => { if (!e.candidate) res(); }; });
+  await updateRoom({ RoomID: roomId, Answer: encodeSession({ type: 'answer', sdp: peerConnection.localDescription.sdp }) });
+  isHost = false;
+  startGame();
 }
 
 async function joinWithSession(session) {

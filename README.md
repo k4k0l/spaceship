@@ -2,7 +2,7 @@
 
 Gra to prosta wariacja na temat klasycznych **Asteroids** napisana w HTML5 i JavaScripcie. Sterujemy małym statkiem kosmicznym i staramy się przetrwać jak najdłużej w polu asteroid. Projekt ma charakter demonstracyjny i służy jako baza do dalszych eksperymentów.
 
-Aktualna wersja gry: **0.2.1**
+Aktualna wersja gry: **0.3.1**
 
 ## Co to jest za gra
 - Strzelanka zręcznościowa 2D z widokiem z góry.
@@ -11,7 +11,9 @@ Aktualna wersja gry: **0.2.1**
 - Celem jest uzyskanie jak najwyższego wyniku zanim skończy się czas lub utracimy wszystkie życia.
 
 ## Latest changes
-- Zaktualizowano do wersji **0.2.1**.
+- Zaktualizowano do wersji **0.3.1**.
+- Multiplayer korzysta teraz z Google Sheets jako prostego serwera sygnalizacji
+  i wymaga jedynie krótkiego identyfikatora pokoju.
 - Wprowadzono wstępne wsparcie dla trybu multiplayer opartego na WebRTC (eksperymentalnie).
 - Dodano animowane obracanie statku przy wyrównywaniu kierunku lotu.
 - Usprawniono sterowanie na urządzeniach mobilnych: tapnięcie obraca i strzela w
@@ -70,10 +72,8 @@ Wszystkie powyższe wartości można teraz modyfikować w menu **Ustawienia**. P
 
 ## Problemy z udostępnianiem linków
 
-Tryb multiplayer generuje bardzo długie adresy URL z zakodowaną konfiguracją sesji.
-Niektóre komunikatory (np. WhatsApp) potrafią przy wklejaniu takiego linku
-niepoprawnie go podzielić, przez co po kliknięciu pojawia się komunikat o błędnym adresie.
-Najbezpieczniej jest przesyłać go w całości, najlepiej bez żadnych dodatkowych
-znaków lub formatowania. Jeśli nadal pojawiają się problemy,
-warto użyć zewnętrznego skracacza, np. [cleanuri.com](https://cleanuri.com/),
-i przesłać skrócony odnośnik.
+We wcześniejszych wersjach gra generowała bardzo długie adresy URL z zakodowaną
+konfiguracją sesji. Od wersji 0.3.1 wymieniamy jedynie krótki identyfikator
+pokoju, więc problem długich linków praktycznie zniknął. Jeśli mimo to chcesz
+używać pełnych linków z parametrem `session`, możesz je nadal skrócić np. przy
+pomocy [cleanuri.com](https://cleanuri.com/).
