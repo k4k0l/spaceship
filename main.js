@@ -1,7 +1,7 @@
 
 const GAME_NAME = 'Asteroids';
 const GAME_VERSION = '0.3.1';
-const SIGNALING_URL = 'https://script.google.com/macros/s/AKfycbxmbFlb8ntvxlYGe9-NV-75eEVvpMhU9CxdwW3DYX18KZsRgFSH3gYBp9qjBGwFCMKu/exec';
+const SIGNALING_URL = 'https://script.google.com/macros/s/AKfycbxQPVHVEjrIjGfc-b7HfDdLcKjIdwHJPriR0marwKhDYbJIDI-XPVlk6qu_fAFdRpFC/exec';
 
 const canvas = document.getElementById('game');
 const mapCanvas = document.getElementById('minimap');
@@ -155,7 +155,11 @@ async function getRoomData(roomId) {
 }
 
 async function updateRoom(data) {
-  await fetch(SIGNALING_URL, { method: 'POST', body: JSON.stringify(data) });
+  await fetch(SIGNALING_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify(data)
+  });
 }
 
 function generateSettingsText(values) {
