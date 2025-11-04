@@ -41,6 +41,11 @@ const backBtn = document.getElementById('backBtn');
 const controlsBack = document.getElementById('controlsBack');
 const aboutBack = document.getElementById('aboutBack');
 const creditsBack = document.getElementById('creditsBack');
+const easterEggBtn = document.getElementById('easterEggBtn');
+const pinballScreen = document.getElementById('pinballScreen');
+const pinballCanvas = document.getElementById('pinballCanvas');
+const pinballStatus = document.getElementById('pinballStatus');
+const pinballBack = document.getElementById('pinballBack');
 
 const mobileControls = document.getElementById('mobileControls');
 const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -277,6 +282,7 @@ function renderStars(timestamp) {
 }
 
 let creditsInterval;
+let pinballGame = null;
 let game;
 
 if (isMobile) {
@@ -474,6 +480,30 @@ canvas.addEventListener('touchend', e => {
   swipeActive = false;
 });
 
+function stopPinballGame() {
+  if (pinballGame) pinballGame.stop();
+}
+
+function showPinball() {
+  hideCredits();
+  hideScreens();
+  if (typeof PinballGame === 'undefined') {
+    alert('Pinball module failed to load. Please reload the page.');
+    showMenu();
+    return;
+  }
+  pinballScreen.classList.remove('hidden');
+  if (!pinballGame) {
+    pinballGame = new PinballGame(pinballCanvas, pinballStatus);
+  }
+  pinballGame.start();
+}
+
+function hidePinball() {
+  stopPinballGame();
+  pinballScreen.classList.add('hidden');
+}
+
 function hideScreens() {
   cancelAnimationFrame(starAnim);
   if (menuMusic) menuMusic.pause();
@@ -483,7 +513,9 @@ function hideScreens() {
   controlsScreen.classList.add('hidden');
   aboutScreen.classList.add('hidden');
   creditsScreen.classList.add('hidden');
+  pinballScreen.classList.add('hidden');
   resumeBtn.classList.add('hidden');
+  stopPinballGame();
 }
 
 function showMenu() {
@@ -722,6 +754,7 @@ settingsBtn.onclick = showSettings;
 controlsBtn.onclick = showControls;
 aboutBtn.onclick = showAbout;
 creditsBtn.onclick = showCredits;
+easterEggBtn.onclick = showPinball;
 singleBtn.onclick = startGame;
 hostBtn.onclick = startHost;
 joinBtn.onclick = startJoin;
@@ -747,8 +780,9 @@ resetBtn.onclick = () => { settingsData = defaultSettingsText; editor.setValue(d
 controlsBack.onclick = () => { showMenu(); };
 aboutBack.onclick = () => { showMenu(); };
 creditsBack.onclick = () => { hideCredits(); showMenu(); };
+pinballBack.onclick = () => { hidePinball(); showCredits(); };
 
-[newGameBtn, settingsBtn, controlsBtn, aboutBtn, creditsBtn, backBtn, controlsBack, aboutBack, creditsBack, resetBtn, singleBtn, hostBtn, joinBtn, resumeBtn].forEach(btn => {
+[newGameBtn, settingsBtn, controlsBtn, aboutBtn, creditsBtn, easterEggBtn, backBtn, controlsBack, aboutBack, creditsBack, pinballBack, resetBtn, singleBtn, hostBtn, joinBtn, resumeBtn].forEach(btn => {
   btn.addEventListener('mouseenter', () => playTone(880, 0.05));
 });
 
