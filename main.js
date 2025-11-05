@@ -42,10 +42,10 @@ const controlsBack = document.getElementById('controlsBack');
 const aboutBack = document.getElementById('aboutBack');
 const creditsBack = document.getElementById('creditsBack');
 const easterEggBtn = document.getElementById('easterEggBtn');
-const knockScreen = document.getElementById('knockScreen');
-const knockCanvas = document.getElementById('knockCanvas');
-const knockStatus = document.getElementById('knockStatus');
-const knockBack = document.getElementById('knockBack');
+const portalScreen = document.getElementById('portalScreen');
+const portalCanvas = document.getElementById('portalCanvas');
+const portalStatus = document.getElementById('portalStatus');
+const portalBack = document.getElementById('portalBack');
 
 const mobileControls = document.getElementById('mobileControls');
 const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -282,7 +282,7 @@ function renderStars(timestamp) {
 }
 
 let creditsInterval;
-let knockVisualizer = null;
+let portalExperience = null;
 let game;
 
 if (isMobile) {
@@ -480,28 +480,28 @@ canvas.addEventListener('touchend', e => {
   swipeActive = false;
 });
 
-function stopKnockVisualizer() {
-  if (knockVisualizer) knockVisualizer.stop();
+function stopPortalExperience() {
+  if (portalExperience) portalExperience.stop();
 }
 
-function showKnockVisualizer() {
+function showPortalExperience() {
   hideCredits();
   hideScreens();
   if (typeof KnockVisualizer === 'undefined') {
-    alert('Knock visualizer failed to load. Please reload the page.');
+    alert('Pocket reality portal failed to load. Please reload the page.');
     showMenu();
     return;
   }
-  knockScreen.classList.remove('hidden');
-  if (!knockVisualizer) {
-    knockVisualizer = new KnockVisualizer(knockCanvas, knockStatus);
+  portalScreen.classList.remove('hidden');
+  if (!portalExperience) {
+    portalExperience = new KnockVisualizer(portalCanvas, portalStatus);
   }
-  knockVisualizer.start();
+  portalExperience.start();
 }
 
-function hideKnockVisualizer() {
-  stopKnockVisualizer();
-  knockScreen.classList.add('hidden');
+function hidePortalExperience() {
+  stopPortalExperience();
+  portalScreen.classList.add('hidden');
 }
 
 function hideScreens() {
@@ -513,9 +513,9 @@ function hideScreens() {
   controlsScreen.classList.add('hidden');
   aboutScreen.classList.add('hidden');
   creditsScreen.classList.add('hidden');
-  knockScreen.classList.add('hidden');
+  portalScreen.classList.add('hidden');
   resumeBtn.classList.add('hidden');
-  stopKnockVisualizer();
+  stopPortalExperience();
 }
 
 function showMenu() {
@@ -754,7 +754,7 @@ settingsBtn.onclick = showSettings;
 controlsBtn.onclick = showControls;
 aboutBtn.onclick = showAbout;
 creditsBtn.onclick = showCredits;
-easterEggBtn.onclick = showKnockVisualizer;
+easterEggBtn.onclick = showPortalExperience;
 singleBtn.onclick = startGame;
 hostBtn.onclick = startHost;
 joinBtn.onclick = startJoin;
@@ -780,9 +780,9 @@ resetBtn.onclick = () => { settingsData = defaultSettingsText; editor.setValue(d
 controlsBack.onclick = () => { showMenu(); };
 aboutBack.onclick = () => { showMenu(); };
 creditsBack.onclick = () => { hideCredits(); showMenu(); };
-knockBack.onclick = () => { hideKnockVisualizer(); showCredits(); };
+portalBack.onclick = () => { hidePortalExperience(); showCredits(); };
 
-[newGameBtn, settingsBtn, controlsBtn, aboutBtn, creditsBtn, easterEggBtn, backBtn, controlsBack, aboutBack, creditsBack, knockBack, resetBtn, singleBtn, hostBtn, joinBtn, resumeBtn].forEach(btn => {
+[newGameBtn, settingsBtn, controlsBtn, aboutBtn, creditsBtn, easterEggBtn, backBtn, controlsBack, aboutBack, creditsBack, portalBack, resetBtn, singleBtn, hostBtn, joinBtn, resumeBtn].forEach(btn => {
   btn.addEventListener('mouseenter', () => playTone(880, 0.05));
 });
 

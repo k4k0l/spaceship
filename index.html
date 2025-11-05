@@ -31,8 +31,8 @@
     .hidden { display: none; }
     .screen.hidden { display: none; }
     #mobileControls.hidden { display: none; }
-    #knockScreen { background: radial-gradient(circle at center, #081325, #040813 65%, #010309); }
-    #knockCanvas {
+    #portalScreen { background: radial-gradient(circle at center, #081325, #040813 65%, #010309); }
+    #portalCanvas {
       width: min(90vw, 420px);
       height: min(90vh, 680px);
       background: linear-gradient(170deg, rgba(6,12,24,0.98), rgba(2,4,8,0.95));
@@ -40,8 +40,8 @@
       border-radius: 24px;
       box-shadow: 0 24px 80px rgba(0,0,0,0.65);
     }
-    #knockInfo { max-width: 520px; margin: 10px auto 0; line-height: 1.5; font-size: 18px; color: #cddaff; }
-    #knockScreen button { font-size: 32px; }
+    #portalInfo { max-width: 520px; margin: 10px auto 0; line-height: 1.5; font-size: 18px; color: #cddaff; }
+    #portalScreen button { font-size: 32px; }
     #swipeHandle {
       position: fixed;
       top: 0;
@@ -183,14 +183,14 @@
     <button id="creditsBack">Back</button>
   </div>
 
-  <div id="knockScreen" class="screen hidden">
-    <h2>Hull Knock Visualizer</h2>
-    <canvas id="knockCanvas" width="420" height="680"></canvas>
-    <div id="knockInfo">
-      <p id="knockStatus">A vertical labyrinth is hidden inside the console. Allow motion access, then tilt and shake your device to roll the metal ball through slick, sticky, magnetic and rough stretches. Some gates only open when you hold the phone upright or level.</p>
-      <p>For desktop testing, tap on either side of the panel to fire a simulated solenoid pulse.</p>
+  <div id="portalScreen" class="screen hidden">
+    <h2>Kieszeń Rzeczywistości</h2>
+    <canvas id="portalCanvas" width="420" height="680"></canvas>
+    <div id="portalInfo">
+      <p id="portalStatus">Przechyl telefon i nadaj dostęp do czujników ruchu, aby otworzyć okno do miniaturowej rzeczywistości.</p>
+      <p>Trzymaj urządzenie jak wizjer. Ruchy telefonu przesuwają kamerę w przestrzeni o rozpiętości jednego ramienia, a jego nachylenie wskazuje kierunek patrzenia.</p>
     </div>
-    <button id="knockBack">Back to Credits</button>
+    <button id="portalBack">Powrót do kredytów</button>
   </div>
 
   <div id="footer"><strong id="footerVersion">Version</strong></div>
