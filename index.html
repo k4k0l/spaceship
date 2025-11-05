@@ -6,6 +6,7 @@
   <title>Simple Asteroids Game</title>
   <!-- tiny transparent favicon to avoid 404 errors -->
   <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/5/hPQAH/wM7fGNCAA==">
+  <link rel="stylesheet" href="easter-egg/styles.css">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Doto:wght@100..900&display=swap');
     body { margin: 0; background: #222; color: #fff; font-family: 'Doto', sans-serif; text-align: center; overflow: hidden; }
@@ -31,17 +32,6 @@
     .hidden { display: none; }
     .screen.hidden { display: none; }
     #mobileControls.hidden { display: none; }
-    #portalScreen { background: radial-gradient(circle at center, #081325, #040813 65%, #010309); }
-    #portalCanvas {
-      width: min(90vw, 420px);
-      height: min(90vh, 680px);
-      background: linear-gradient(170deg, rgba(6,12,24,0.98), rgba(2,4,8,0.95));
-      border: 10px solid rgba(70, 110, 170, 0.65);
-      border-radius: 24px;
-      box-shadow: 0 24px 80px rgba(0,0,0,0.65);
-    }
-    #portalInfo { max-width: 520px; margin: 10px auto 0; line-height: 1.5; font-size: 18px; color: #cddaff; }
-    #portalScreen button { font-size: 32px; }
     #swipeHandle {
       position: fixed;
       top: 0;
@@ -179,7 +169,7 @@
   <div id="creditsScreen" class="screen hidden">
     <h2>Credits</h2>
     <p>Created with help of OpenAI Codex</p>
-    <button id="easterEggBtn">Easter Egg</button>
+    <button id="portalTrigger" class="portal-trigger" aria-label="Activate secret portal"><span class="visually-hidden">Activate secret portal</span></button>
     <button id="creditsBack">Back</button>
   </div>
 

@@ -41,7 +41,7 @@ const backBtn = document.getElementById('backBtn');
 const controlsBack = document.getElementById('controlsBack');
 const aboutBack = document.getElementById('aboutBack');
 const creditsBack = document.getElementById('creditsBack');
-const easterEggBtn = document.getElementById('easterEggBtn');
+const portalTrigger = document.getElementById('portalTrigger');
 const portalScreen = document.getElementById('portalScreen');
 const portalCanvas = document.getElementById('portalCanvas');
 const portalStatus = document.getElementById('portalStatus');
@@ -487,6 +487,9 @@ function stopPortalExperience() {
 function showPortalExperience() {
   hideCredits();
   hideScreens();
+  if (window.ensurePocketRealityPortal) {
+    window.ensurePocketRealityPortal().catch(() => {});
+  }
   if (typeof KnockVisualizer === 'undefined') {
     alert('Pocket reality portal failed to load. Please reload the page.');
     showMenu();
@@ -754,7 +757,7 @@ settingsBtn.onclick = showSettings;
 controlsBtn.onclick = showControls;
 aboutBtn.onclick = showAbout;
 creditsBtn.onclick = showCredits;
-easterEggBtn.onclick = showPortalExperience;
+portalTrigger.onclick = showPortalExperience;
 singleBtn.onclick = startGame;
 hostBtn.onclick = startHost;
 joinBtn.onclick = startJoin;
@@ -782,7 +785,7 @@ aboutBack.onclick = () => { showMenu(); };
 creditsBack.onclick = () => { hideCredits(); showMenu(); };
 portalBack.onclick = () => { hidePortalExperience(); showCredits(); };
 
-[newGameBtn, settingsBtn, controlsBtn, aboutBtn, creditsBtn, easterEggBtn, backBtn, controlsBack, aboutBack, creditsBack, portalBack, resetBtn, singleBtn, hostBtn, joinBtn, resumeBtn].forEach(btn => {
+[newGameBtn, settingsBtn, controlsBtn, aboutBtn, creditsBtn, portalTrigger, backBtn, controlsBack, aboutBack, creditsBack, portalBack, resetBtn, singleBtn, hostBtn, joinBtn, resumeBtn].forEach(btn => {
   btn.addEventListener('mouseenter', () => playTone(880, 0.05));
 });
 
