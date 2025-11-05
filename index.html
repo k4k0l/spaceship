@@ -31,17 +31,17 @@
     .hidden { display: none; }
     .screen.hidden { display: none; }
     #mobileControls.hidden { display: none; }
-    #pinballScreen { background: radial-gradient(circle at center, #1a2740, #050913 70%, #000); }
-    #pinballCanvas {
+    #knockScreen { background: radial-gradient(circle at center, #081325, #040813 65%, #010309); }
+    #knockCanvas {
       width: min(90vw, 420px);
       height: min(90vh, 680px);
-      background: linear-gradient(160deg, rgba(20,28,40,0.95), rgba(4,8,12,0.95));
-      border: 10px solid #394b64;
+      background: linear-gradient(170deg, rgba(6,12,24,0.98), rgba(2,4,8,0.95));
+      border: 10px solid rgba(70, 110, 170, 0.65);
       border-radius: 24px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.65);
     }
-    #pinballInfo { max-width: 480px; margin: 10px auto 0; line-height: 1.4; font-size: 18px; }
-    #pinballScreen button { font-size: 32px; }
+    #knockInfo { max-width: 520px; margin: 10px auto 0; line-height: 1.5; font-size: 18px; color: #cddaff; }
+    #knockScreen button { font-size: 32px; }
     #swipeHandle {
       position: fixed;
       top: 0;
@@ -183,13 +183,14 @@
     <button id="creditsBack">Back</button>
   </div>
 
-  <div id="pinballScreen" class="screen hidden">
-    <h2>Gravity Pinball</h2>
-    <canvas id="pinballCanvas" width="420" height="680"></canvas>
-    <div id="pinballInfo">
-      <p id="pinballStatus">Allow motion and haptics to control the flippers with gentle knocks. Press firmly or flick the phone down then up to launch the ball.</p>
+  <div id="knockScreen" class="screen hidden">
+    <h2>Hull Knock Visualizer</h2>
+    <canvas id="knockCanvas" width="420" height="680"></canvas>
+    <div id="knockInfo">
+      <p id="knockStatus">Tap the panel, choose &ldquo;Allow&rdquo; when prompted, then knock the chassis left or right. Stronger hits light up the correct side and trigger heavier vibration.</p>
+      <p>For desktop testing, tap on either side of the panel to fire a simulated solenoid pulse.</p>
     </div>
-    <button id="pinballBack">Back to Credits</button>
+    <button id="knockBack">Back to Credits</button>
   </div>
 
   <div id="footer"><strong id="footerVersion">Version</strong></div>
@@ -201,7 +202,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.0/mode-json5.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
   <script src="game.js"></script>
-  <script src="pinball.js"></script>
+  <script src="knock.js"></script>
   <script src="main.js"></script>
 </body>
 </html>
