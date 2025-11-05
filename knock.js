@@ -1,24 +1,314 @@
 (function () {
-  const TWO_PI = Math.PI * 2;
+  const TAU = Math.PI * 2;
+  const G = 9.81;
+
+  const SURFACES = {
+    normal:   { color: '#374553', friction: 0.85, bounce: 0.5, traction: 0.9 },
+    slick:    { color: '#4f7cff', friction: 0.25, bounce: 0.65, traction: 0.3 },
+    rough:    { color: '#745533', friction: 1.4, bounce: 0.4, traction: 1.4 },
+    magnetic: { color: '#6b2fb4', friction: 0.9, bounce: 0.55, traction: 1.8 },
+    sticky:   { color: '#0f8c4c', friction: 2.6, bounce: 0.25, traction: 2.8 }
+  };
+
+  const FLOOR_PATTERN_COLOR = 'rgba(255,255,255,0.05)';
+
+  const ORIENTATION_REWARD = {
+    horizontal: 'Hold the phone more level to slip through the low tunnels.',
+    vertical: 'Tip the phone upright to tackle the climbing shafts.'
+  };
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
   }
 
-  function drawRoundedRect(ctx, x, y, width, height, radius) {
-    const r = Math.min(radius, width / 2, height / 2);
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + width - r, y);
-    ctx.arcTo(x + width, y, x + width, y + r, r);
-    ctx.lineTo(x + width, y + height - r);
-    ctx.arcTo(x + width, y + height, x + width - r, y + height, r);
-    ctx.lineTo(x + r, y + height);
-    ctx.arcTo(x, y + height, x, y + height - r, r);
-    ctx.lineTo(x, y + r);
-    ctx.arcTo(x, y, x + r, y, r);
-    ctx.closePath();
-    ctx.fill();
+  function lerp(a, b, t) {
+    return a + (b - a) * t;
+  }
+
+  function choice(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  function randRange(min, max) {
+    return Math.random() * (max - min) + min;
+  }
+
+  function rotateVector(x, y, angleRad) {
+    const cos = Math.cos(angleRad);
+    const sin = Math.sin(angleRad);
+    return {
+      x: x * cos - y * sin,
+      y: x * sin + y * cos
+    };
+  }
+
+  class DynamicElement {
+    constructor(data) {
+      Object.assign(this, data);
+      this.time = Math.random() * 1000;
+      this.state = 0;
+    }
+
+    update(dt, tiltStrength) {
+      this.time += dt;
+      switch (this.kind) {
+        case 'seesaw': {
+          const target = clamp(tiltStrength.x * 0.7, -0.8, 0.8);
+          this.state = lerp(this.state, target, clamp(dt * 2.5, 0, 1));
+          break;
+        }
+        case 'piston': {
+          const speed = this.speed || 1.1;
+          this.state = Math.sin(this.time * speed) * this.amplitude;
+          break;
+        }
+        case 'pendulum': {
+          const speed = this.speed || 1.5;
+          const sway = Math.sin(this.time * speed + this.phase) * this.amplitude;
+          this.state = sway;
+          break;
+        }
+      }
+    }
+
+    render(ctx, camera) {
+      ctx.save();
+      ctx.translate(this.x - camera.x, this.y - camera.y);
+      if (this.kind === 'seesaw') {
+        ctx.rotate(this.state);
+        ctx.fillStyle = 'rgba(230,230,255,0.8)';
+        ctx.fillRect(-this.width / 2, -this.thickness / 2, this.width, this.thickness);
+        ctx.fillStyle = 'rgba(160,180,255,0.4)';
+        ctx.beginPath();
+        ctx.arc(0, 0, this.thickness * 0.8, 0, TAU);
+        ctx.fill();
+      } else if (this.kind === 'piston') {
+        ctx.fillStyle = 'rgba(255,90,60,0.9)';
+        const offset = this.axis === 'x' ? this.state : 0;
+        const offsetY = this.axis === 'y' ? this.state : 0;
+        ctx.fillRect(-this.width / 2 + offset, -this.height / 2 + offsetY, this.width, this.height);
+      } else if (this.kind === 'pendulum') {
+        ctx.rotate(this.state);
+        ctx.strokeStyle = 'rgba(240,240,240,0.6)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, this.length);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,210,90,0.85)';
+        ctx.beginPath();
+        ctx.arc(0, this.length, this.massRadius, 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    applyInteraction(ball, dt) {
+      if (this.kind === 'seesaw') {
+        const relative = {
+          x: ball.x - this.x,
+          y: ball.y - this.y
+        };
+        const s = Math.sin(this.state);
+        const c = Math.cos(this.state);
+        const rotatedY = relative.x * s + relative.y * c;
+        const rotatedX = relative.x * c - relative.y * s;
+        if (Math.abs(rotatedX) < this.width / 2 && Math.abs(rotatedY) < this.thickness) {
+          ball.vx += -s * 18 * dt;
+          ball.vy += c * 18 * dt;
+          ball.x += -s * 8 * dt;
+          ball.y += c * 8 * dt;
+        }
+      } else if (this.kind === 'piston') {
+        const px = this.x + (this.axis === 'x' ? this.state : 0);
+        const py = this.y + (this.axis === 'y' ? this.state : 0);
+        const within = Math.abs(ball.x - px) < (this.width / 2 + ball.radius) &&
+          Math.abs(ball.y - py) < (this.height / 2 + ball.radius);
+        if (within) {
+          if (this.axis === 'x') {
+            const dir = Math.sign(ball.x - px) || 1;
+            ball.vx = Math.max(Math.abs(ball.vx), 90) * dir;
+            ball.x = px + dir * (this.width / 2 + ball.radius + 2);
+          } else {
+            const dir = Math.sign(ball.y - py) || 1;
+            ball.vy = Math.max(Math.abs(ball.vy), 90) * dir;
+            ball.y = py + dir * (this.height / 2 + ball.radius + 2);
+          }
+        }
+      } else if (this.kind === 'pendulum') {
+        const swingAngle = this.state;
+        const anchorX = this.x;
+        const anchorY = this.y;
+        const bobX = anchorX + Math.sin(swingAngle) * this.length;
+        const bobY = anchorY + Math.cos(swingAngle) * this.length;
+        const dx = ball.x - bobX;
+        const dy = ball.y - bobY;
+        const dist = Math.hypot(dx, dy);
+        const totalRadius = ball.radius + this.massRadius;
+        if (dist < totalRadius) {
+          const nx = dx / (dist || 1);
+          const ny = dy / (dist || 1);
+          const overlap = totalRadius - dist;
+          ball.x += nx * overlap;
+          ball.y += ny * overlap;
+          const relativeSpeed = ball.vx * nx + ball.vy * ny;
+          if (relativeSpeed < 0) {
+            ball.vx -= 1.8 * relativeSpeed * nx;
+            ball.vy -= 1.8 * relativeSpeed * ny;
+          }
+        }
+      }
+    }
+  }
+
+  class Labyrinth {
+    constructor(width, height, tileSize) {
+      this.width = width;
+      this.height = height;
+      this.tileSize = tileSize;
+      this.cols = Math.ceil(width / tileSize);
+      this.rows = Math.ceil(height / tileSize);
+      this.tiles = new Array(this.cols * this.rows).fill(null);
+      this.orientationHints = [];
+      this.dynamicElements = [];
+      this.pickups = [];
+      this.generate();
+    }
+
+    index(col, row) {
+      return row * this.cols + col;
+    }
+
+    setTile(col, row, data) {
+      if (col < 0 || row < 0 || col >= this.cols || row >= this.rows) return;
+      this.tiles[this.index(col, row)] = data;
+    }
+
+    getTile(col, row) {
+      if (col < 0 || row < 0 || col >= this.cols || row >= this.rows) return null;
+      return this.tiles[this.index(col, row)];
+    }
+
+    generate() {
+      const pathCols = this.cols;
+      const pathRows = this.rows;
+      const startCol = Math.floor(pathCols / 2);
+      let currentCol = startCol;
+      for (let row = 0; row < pathRows; row++) {
+        const surfaceKeys = Object.keys(SURFACES);
+        const surface = choice(surfaceKeys);
+        this.setTile(currentCol, row, { type: 'floor', surface });
+        if (Math.random() < 0.2) {
+          this.setTile(currentCol, row, {
+            type: 'floor',
+            surface,
+            requiredOrientation: Math.random() < 0.5 ? 'vertical' : 'horizontal'
+          });
+        }
+        const carveWidth = Math.random() < 0.4 ? 2 : 1;
+        for (let offset = 1; offset <= carveWidth; offset++) {
+          const side = Math.random() < 0.5 ? -1 : 1;
+          this.setTile(currentCol + side * offset, row, { type: 'floor', surface: choice(surfaceKeys) });
+        }
+        const direction = Math.random();
+        if (direction < 0.33) {
+          currentCol = clamp(currentCol - 1, 1, pathCols - 2);
+        } else if (direction > 0.66) {
+          currentCol = clamp(currentCol + 1, 1, pathCols - 2);
+        }
+      }
+
+      for (let row = 0; row < this.rows; row++) {
+        for (let col = 0; col < this.cols; col++) {
+          if (!this.getTile(col, row)) {
+            this.setTile(col, row, { type: 'wall' });
+          }
+        }
+      }
+
+      this.orientationHints = [];
+      for (let row = 2; row < this.rows - 2; row += Math.floor(randRange(3, 6))) {
+        const col = clamp(Math.floor(randRange(2, this.cols - 3)), 1, this.cols - 2);
+        const tile = this.getTile(col, row);
+        if (tile && tile.type === 'floor' && !tile.requiredOrientation && Math.random() < 0.4) {
+          tile.requiredOrientation = Math.random() < 0.5 ? 'horizontal' : 'vertical';
+          this.orientationHints.push({
+            col,
+            row,
+            kind: tile.requiredOrientation
+          });
+        }
+      }
+
+      this.generateDynamics();
+      this.generatePickups();
+    }
+
+    generateDynamics() {
+      this.dynamicElements = [];
+      const total = Math.floor(this.rows / 6);
+      for (let i = 0; i < total; i++) {
+        const row = Math.floor(randRange(3, this.rows - 4));
+        const col = Math.floor(randRange(1, this.cols - 1));
+        const tile = this.getTile(col, row);
+        if (!tile || tile.type !== 'floor') continue;
+        if (Math.random() < 0.33) {
+          this.dynamicElements.push(new DynamicElement({
+            kind: 'seesaw',
+            x: (col + 0.5) * this.tileSize,
+            y: (row + 0.5) * this.tileSize,
+            width: this.tileSize * randRange(1.4, 1.9),
+            thickness: this.tileSize * 0.18
+          }));
+        } else if (Math.random() < 0.5) {
+          this.dynamicElements.push(new DynamicElement({
+            kind: 'piston',
+            x: (col + 0.5) * this.tileSize,
+            y: (row + 0.5) * this.tileSize,
+            width: this.tileSize * randRange(0.5, 0.8),
+            height: this.tileSize * randRange(0.5, 1.2),
+            axis: Math.random() < 0.5 ? 'x' : 'y',
+            amplitude: this.tileSize * randRange(0.4, 1.0),
+            speed: randRange(0.5, 1.5)
+          }));
+        } else {
+          this.dynamicElements.push(new DynamicElement({
+            kind: 'pendulum',
+            x: (col + 0.5) * this.tileSize,
+            y: (row + 0.1) * this.tileSize,
+            amplitude: randRange(0.4, 1.2),
+            length: this.tileSize * randRange(1.1, 1.8),
+            massRadius: this.tileSize * randRange(0.18, 0.3),
+            phase: Math.random() * Math.PI * 2,
+            speed: randRange(0.6, 1.8)
+          }));
+        }
+      }
+    }
+
+    generatePickups() {
+      this.pickups = [];
+      const count = Math.floor(this.rows / 5);
+      for (let i = 0; i < count; i++) {
+        const col = Math.floor(randRange(1, this.cols - 1));
+        const row = Math.floor(randRange(2, this.rows - 2));
+        const tile = this.getTile(col, row);
+        if (!tile || tile.type !== 'floor') continue;
+        const scale = Math.random() < 0.5 ? 0.6 : 1.6;
+        this.pickups.push({
+          x: (col + 0.5) * this.tileSize,
+          y: (row + 0.5) * this.tileSize,
+          radius: this.tileSize * 0.18,
+          scale
+        });
+      }
+    }
+
+    getTileAtPosition(x, y) {
+      const col = Math.floor(x / this.tileSize);
+      const row = Math.floor(y / this.tileSize);
+      return { tile: this.getTile(col, row), col, row };
+    }
   }
 
   class KnockVisualizer {
@@ -32,27 +322,32 @@
       this.motionRequesting = false;
       this.logicalWidth = canvas.width;
       this.logicalHeight = canvas.height;
-      this.leftLevel = 0;
-      this.rightLevel = 0;
-      this.rings = [];
       this.lastTime = 0;
-      this.lastKnock = null;
-      this.lastHorizontal = 0;
-      this.lastDelta = 0;
-      this.lastStatusUpdate = 0;
-      this.horizontalBaseline = 0;
-      this.lastKnockTime = 0;
-      this.lastReadingTime = 0;
-      this.knockThreshold = 6;
-      this.maxImpulse = 32;
-      this.decayRate = 1.6;
-      this.vibrationSupported = typeof navigator !== 'undefined' &&
-        (typeof navigator.vibrate === 'function' || typeof navigator.webkitVibrate === 'function');
-      this.handleResize = this.handleResize.bind(this);
+      this.camera = { x: 0, y: 0 };
+      this.tilt = { x: 0, y: 0, z: -1 };
+      this.accMagnitude = G;
+      this.shakeTimer = 0;
+      this.boxDepth = 40;
+      this.labyrinth = new Labyrinth(1200, 5400, 140);
+      this.ball = {
+        x: this.labyrinth.width / 2,
+        y: this.labyrinth.tileSize * 0.6,
+        z: 4,
+        vx: 0,
+        vy: 0,
+        vz: 0,
+        radius: 26,
+        mass: 26 * 26 * 0.04,
+        rollAngle: 0
+      };
+      this.targetStatus = '';
+      this.motionHandler = this.handleMotion.bind(this);
+      this.handleResize = this.resize.bind(this);
+      this.pointerDown = this.handlePointerDown.bind(this);
+      this.pointerUp = this.handlePointerUp.bind(this);
+      this.update = this.update.bind(this);
+      this.render = this.render.bind(this);
       this.loop = this.loop.bind(this);
-      this.handleMotion = this.handleMotion.bind(this);
-      this.handlePointerDown = this.handlePointerDown.bind(this);
-      this.handlePointerUp = this.handlePointerUp.bind(this);
     }
 
     start() {
@@ -62,11 +357,11 @@
       this.canvas.style.userSelect = 'none';
       this.resize();
       window.addEventListener('resize', this.handleResize);
-      this.canvas.addEventListener('pointerdown', this.handlePointerDown);
-      this.canvas.addEventListener('pointerup', this.handlePointerUp);
-      this.canvas.addEventListener('pointercancel', this.handlePointerUp);
-      this.updateStatus();
+      this.canvas.addEventListener('pointerdown', this.pointerDown);
+      this.canvas.addEventListener('pointerup', this.pointerUp);
+      this.canvas.addEventListener('pointercancel', this.pointerUp);
       this.lastTime = performance.now();
+      this.updateStatus('Tilt the phone to roll the steel ball. Shake to rattle the maze.');
       this.raf = requestAnimationFrame(this.loop);
     }
 
@@ -75,26 +370,21 @@
       this.running = false;
       cancelAnimationFrame(this.raf);
       window.removeEventListener('resize', this.handleResize);
-      this.canvas.removeEventListener('pointerdown', this.handlePointerDown);
-      this.canvas.removeEventListener('pointerup', this.handlePointerUp);
-      this.canvas.removeEventListener('pointercancel', this.handlePointerUp);
+      this.canvas.removeEventListener('pointerdown', this.pointerDown);
+      this.canvas.removeEventListener('pointerup', this.pointerUp);
+      this.canvas.removeEventListener('pointercancel', this.pointerUp);
       if (this.motionListening) {
-        window.removeEventListener('devicemotion', this.handleMotion, true);
+        window.removeEventListener('devicemotion', this.motionHandler, true);
         this.motionListening = false;
       }
       this.motionAllowed = false;
       this.motionRequesting = false;
-      this.updateStatus('Motion monitoring paused.');
-    }
-
-    handleResize() {
-      this.resize();
     }
 
     resize() {
       const rect = this.canvas.getBoundingClientRect();
-      this.logicalWidth = rect.width || this.canvas.width || 420;
-      this.logicalHeight = rect.height || this.canvas.height || 680;
+      this.logicalWidth = rect.width || this.canvas.width;
+      this.logicalHeight = rect.height || this.canvas.height;
       const dpr = window.devicePixelRatio || 1;
       this.canvas.width = Math.round(this.logicalWidth * dpr);
       this.canvas.height = Math.round(this.logicalHeight * dpr);
@@ -104,7 +394,7 @@
     async requestMotionPermission() {
       if (this.motionAllowed || this.motionRequesting) return;
       if (typeof DeviceMotionEvent === 'undefined') {
-        this.updateStatus('Motion sensors are not available on this device.');
+        this.updateStatus('Motion sensors unavailable. Maze will rely on simulated tilt.');
         return;
       }
       this.motionRequesting = true;
@@ -120,9 +410,8 @@
       }
       this.motionRequesting = false;
       if (this.motionAllowed && !this.motionListening) {
-        window.addEventListener('devicemotion', this.handleMotion, true);
+        window.addEventListener('devicemotion', this.motionHandler, true);
         this.motionListening = true;
-        this.horizontalBaseline = 0;
       }
       this.updateStatus();
     }
@@ -132,20 +421,11 @@
       if (!this.motionAllowed) {
         this.requestMotionPermission();
       }
-      const { x } = this.getLocalCoords(e);
-      const side = x < this.logicalWidth / 2 ? 'left' : 'right';
-      this.triggerKnock(side, 0.35);
+      this.updateStatus('Tilting controls the slope. Rapid shakes bounce the ball.');
     }
 
     handlePointerUp(e) {
       try { this.canvas.releasePointerCapture(e.pointerId); } catch (_) {}
-    }
-
-    getLocalCoords(e) {
-      const rect = this.canvas.getBoundingClientRect();
-      const x = ((e.clientX - rect.left) / rect.width) * this.logicalWidth;
-      const y = ((e.clientY - rect.top) / rect.height) * this.logicalHeight;
-      return { x, y };
     }
 
     getOrientationAngle() {
@@ -158,229 +438,331 @@
       return 0;
     }
 
-    projectHorizontal(acc) {
-      const ax = acc.x || 0;
-      const ay = acc.y || 0;
-      const angle = ((this.getOrientationAngle() % 360) + 360) % 360;
-      if (angle === 90) return ay;
-      if (angle === 270) return -ay;
-      if (angle === 180) return -ax;
-      return ax;
-    }
-
     handleMotion(event) {
       if (!this.running) return;
       const acc = event.accelerationIncludingGravity || event.acceleration;
       if (!acc) return;
-      const horizontal = this.projectHorizontal(acc);
-      if (!Number.isFinite(this.horizontalBaseline)) {
-        this.horizontalBaseline = horizontal;
+      const angle = ((this.getOrientationAngle() % 360) + 360) % 360;
+      let ax = acc.x || 0;
+      let ay = acc.y || 0;
+      let az = acc.z || 0;
+      switch (angle) {
+        case 90:
+          [ax, ay] = [-ay, ax];
+          break;
+        case 180:
+          ax = -ax;
+          ay = -ay;
+          break;
+        case 270:
+          [ax, ay] = [ay, -ax];
+          break;
       }
-      this.horizontalBaseline = this.horizontalBaseline * 0.92 + horizontal * 0.08;
-      const delta = horizontal - this.horizontalBaseline;
-      const magnitude = Math.abs(delta);
-      const now = performance.now();
-      this.lastHorizontal = horizontal;
-      this.lastDelta = delta;
-      this.lastReadingTime = now;
-      if (magnitude > this.knockThreshold && now - this.lastKnockTime > 60) {
-        const side = delta > 0 ? 'right' : 'left';
-        const excess = magnitude - this.knockThreshold;
-        const normalized = clamp(excess / this.maxImpulse, 0, 1);
-        this.triggerKnock(side, normalized);
-        this.lastKnockTime = now;
+      this.accMagnitude = Math.sqrt(ax * ax + ay * ay + az * az);
+      this.tilt.x = clamp(ax / G, -2, 2);
+      this.tilt.y = clamp(ay / G, -2, 2);
+      this.tilt.z = clamp(az / G, -2, 2);
+      const shake = Math.max(0, this.accMagnitude - G * 1.35);
+      if (shake > 0.2) {
+        this.shakeTimer = 0.25;
+        this.ball.vz -= shake * 1.4;
       }
     }
 
-    triggerKnock(side, level) {
-      if (!this.running) return;
-      const clampedLevel = clamp(level, 0.05, 1);
-      if (side === 'left') {
-        this.leftLevel = Math.max(this.leftLevel, clampedLevel);
-      } else {
-        this.rightLevel = Math.max(this.rightLevel, clampedLevel);
+    simulateFallbackTilt(dt) {
+      const time = performance.now() * 0.0003;
+      this.tilt.x = Math.sin(time * 1.3) * 0.3;
+      this.tilt.y = Math.cos(time) * 0.25;
+      this.tilt.z = -1;
+    }
+
+    updateStatus(message) {
+      if (message) {
+        this.targetStatus = message;
       }
-      const centerOffset = this.logicalWidth * 0.2;
-      this.rings.push({
-        side,
-        radius: this.logicalWidth * 0.1,
-        strength: clampedLevel,
-        life: 1,
-        centerX: side === 'left' ? centerOffset : this.logicalWidth - centerOffset
-      });
-      this.lastKnock = {
-        side,
-        level: clampedLevel,
-        timestamp: performance.now()
-      };
-      this.updateStatus();
-      this.vibrate(clampedLevel);
-    }
-
-    vibrate(level) {
-      if (!this.vibrationSupported) return;
-      const tap = Math.round(12 + level * 70);
-      const hold = Math.round(24 + level * 120);
-      const pattern = [0, tap, 14, hold];
-      try {
-        if (typeof navigator.vibrate === 'function') {
-          navigator.vibrate(pattern);
-        } else if (typeof navigator.webkitVibrate === 'function') {
-          navigator.webkitVibrate(pattern);
-        }
-      } catch (_) {}
-    }
-
-    updateStatus(explicitText) {
       if (!this.statusEl) return;
-      if (explicitText) {
-        this.statusEl.textContent = explicitText;
-        return;
-      }
-      if (!this.motionAllowed) {
-        this.statusEl.textContent = 'Tap the panel, allow motion access, then knock left or right. Strong hits fire the virtual solenoid with heavier vibration.';
-        return;
-      }
-      const delta = Math.round(this.lastDelta * 10) / 10;
-      const magnitude = Math.round(Math.abs(this.lastDelta) * 10) / 10;
-      if (this.lastKnock && performance.now() - this.lastKnock.timestamp < 3000) {
-        const side = this.lastKnock.side.toUpperCase();
-        const percent = Math.round(this.lastKnock.level * 100);
-        this.statusEl.textContent = `Motion streaming • Last knock: ${side} ${percent}% • Horizontal Δ ${delta} m/s²`;
-      } else if (this.lastReadingTime && performance.now() - this.lastReadingTime < 1500) {
-        this.statusEl.textContent = `Motion streaming • Horizontal Δ ${delta} m/s² (|Δ| ${magnitude})`;
-      } else {
-        this.statusEl.textContent = 'Motion streaming • Waiting for knocks…';
-      }
+      const orientationMode = Math.abs(this.tilt.y) > Math.abs(this.tilt.x) ? 'vertical' : 'horizontal';
+      const hint = ORIENTATION_REWARD[orientationMode];
+      const pieces = [];
+      if (this.targetStatus) pieces.push(this.targetStatus);
+      pieces.push(`Current posture: <strong>${orientationMode.toUpperCase()}</strong>. ${hint}`);
+      pieces.push('Surfaces: blue = slick, green = sticky, violet = magnetic, brown = rough, steel = balanced.');
+      this.statusEl.innerHTML = pieces.join(' ');
     }
 
     update(dt) {
-      const decay = this.decayRate * dt;
-      this.leftLevel = Math.max(0, this.leftLevel - decay);
-      this.rightLevel = Math.max(0, this.rightLevel - decay);
-      for (const ring of this.rings) {
-        ring.radius += dt * this.logicalWidth * 1.4 * (0.7 + ring.strength);
-        ring.life -= dt * 1.1;
+      if (!this.motionAllowed) {
+        this.simulateFallbackTilt(dt);
       }
-      this.rings = this.rings.filter(r => r.life > 0);
-      const now = performance.now();
-      if (now - this.lastStatusUpdate > 250) {
-        this.updateStatus();
-        this.lastStatusUpdate = now;
+      if (this.shakeTimer > 0) {
+        this.shakeTimer -= dt;
+        this.ball.vx += randRange(-80, 80) * dt;
+        this.ball.vy += randRange(-80, 80) * dt;
       }
+
+      const { ball, labyrinth } = this;
+      const { tile, col, row } = labyrinth.getTileAtPosition(ball.x, ball.y);
+      const surface = tile && tile.surface ? SURFACES[tile.surface] : SURFACES.normal;
+      const orientationMode = Math.abs(this.tilt.y) > Math.abs(this.tilt.x) ? 'vertical' : 'horizontal';
+
+      const slopeStrength = 620;
+      const accX = this.tilt.x * slopeStrength / Math.max(ball.mass, 1) * surface.traction;
+      const accY = this.tilt.y * slopeStrength / Math.max(ball.mass, 1) * surface.traction;
+
+      ball.vx += accX * dt;
+      ball.vy += accY * dt;
+
+      const friction = surface.friction;
+      ball.vx -= ball.vx * friction * dt;
+      ball.vy -= ball.vy * friction * dt;
+
+      if (tile && tile.requiredOrientation && tile.requiredOrientation !== orientationMode) {
+        const penalty = tile.requiredOrientation === 'vertical' ? Math.abs(this.tilt.x) : Math.abs(this.tilt.y);
+        const blockStrength = clamp(1 - penalty, 0.3, 1.2);
+        ball.vx *= 0.25 * blockStrength;
+        ball.vy *= 0.25 * blockStrength;
+      }
+
+      if (tile && tile.surface === 'magnetic') {
+        const cx = (col + 0.5) * labyrinth.tileSize;
+        const cy = (row + 0.5) * labyrinth.tileSize;
+        const dx = cx - ball.x;
+        const dy = cy - ball.y;
+        ball.vx += dx * dt * 6.5;
+        ball.vy += dy * dt * 6.5;
+      }
+
+      if (tile && tile.surface === 'sticky') {
+        ball.vx *= 1 - clamp(dt * 5.5, 0, 0.9);
+        ball.vy *= 1 - clamp(dt * 5.5, 0, 0.9);
+      }
+
+      ball.x += ball.vx * dt;
+      ball.y += ball.vy * dt;
+
+      const bounceFactor = surface.bounce;
+      if (ball.x - ball.radius < 0) {
+        ball.x = ball.radius;
+        ball.vx = Math.abs(ball.vx) * bounceFactor;
+      } else if (ball.x + ball.radius > labyrinth.width) {
+        ball.x = labyrinth.width - ball.radius;
+        ball.vx = -Math.abs(ball.vx) * bounceFactor;
+      }
+      if (ball.y - ball.radius < 0) {
+        ball.y = ball.radius;
+        ball.vy = Math.abs(ball.vy) * bounceFactor;
+      } else if (ball.y + ball.radius > labyrinth.height) {
+        ball.y = labyrinth.height - ball.radius;
+        ball.vy = -Math.abs(ball.vy) * bounceFactor;
+      }
+
+      this.resolveMazeWalls(ball, labyrinth);
+
+      const gravityNormal = clamp(-this.tilt.z, -1.5, 1.5);
+      ball.vz += gravityNormal * 120 * dt;
+      ball.vz -= ball.vz * 2.5 * dt;
+      ball.z += ball.vz * dt;
+      if (ball.z < ball.radius * -0.35) {
+        ball.z = ball.radius * -0.35;
+        ball.vz = -ball.vz * 0.55;
+      } else if (ball.z > this.boxDepth - ball.radius * 0.65) {
+        ball.z = this.boxDepth - ball.radius * 0.65;
+        ball.vz = -Math.abs(ball.vz) * 0.4;
+      }
+
+      labyrinth.dynamicElements.forEach(el => {
+        el.update(dt, this.tilt);
+        el.applyInteraction(ball, dt);
+      });
+
+      this.applyPickups();
+      ball.mass = Math.max(10, ball.radius * ball.radius * 0.05);
+      const speed = Math.hypot(ball.vx, ball.vy);
+      ball.rollAngle += speed * dt / Math.max(ball.radius, 1);
+
+      const padding = 200;
+      this.camera.x = clamp(ball.x - this.logicalWidth / 2, 0, Math.max(0, labyrinth.width - this.logicalWidth));
+      this.camera.y = clamp(ball.y - this.logicalHeight / 2, 0, Math.max(0, labyrinth.height - this.logicalHeight));
+      this.camera.x = clamp(this.camera.x, ball.x - padding, ball.x + padding - this.logicalWidth);
+      this.camera.y = clamp(this.camera.y, ball.y - padding, ball.y + padding - this.logicalHeight);
+      this.camera.x = clamp(this.camera.x, 0, Math.max(0, labyrinth.width - this.logicalWidth));
+      this.camera.y = clamp(this.camera.y, 0, Math.max(0, labyrinth.height - this.logicalHeight));
     }
 
-    draw() {
-      const ctx = this.ctx;
-      const w = this.logicalWidth;
-      const h = this.logicalHeight;
-      ctx.clearRect(0, 0, w, h);
-      const bg = ctx.createLinearGradient(0, 0, 0, h);
-      bg.addColorStop(0, '#04060e');
-      bg.addColorStop(1, '#020308');
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, w, h);
-
-      const mid = w / 2;
-      const pad = Math.min(48, w * 0.12);
-      const radius = Math.max(18, w * 0.04);
-      const barWidth = mid - pad * 1.4;
-      const leftIntensity = Math.pow(this.leftLevel, 0.75);
-      const rightIntensity = Math.pow(this.rightLevel, 0.75);
-
-      // Left glow
-      const leftGradient = ctx.createLinearGradient(0, h / 2, mid, h / 2);
-      leftGradient.addColorStop(0, `rgba(90, 170, 255, ${0.25 + leftIntensity * 0.55})`);
-      leftGradient.addColorStop(1, 'rgba(90, 170, 255, 0)');
-      ctx.fillStyle = leftGradient;
-      ctx.fillRect(0, pad * 0.5, mid, h - pad);
-
-      // Right glow
-      const rightGradient = ctx.createLinearGradient(w, h / 2, mid, h / 2);
-      rightGradient.addColorStop(0, `rgba(255, 160, 96, ${0.25 + rightIntensity * 0.55})`);
-      rightGradient.addColorStop(1, 'rgba(255, 160, 96, 0)');
-      ctx.fillStyle = rightGradient;
-      ctx.fillRect(mid, pad * 0.5, mid, h - pad);
-
-      // Pulsing rings
-      ctx.lineCap = 'round';
-      for (const ring of this.rings) {
-        const alpha = clamp(ring.life, 0, 1) * (0.35 + ring.strength * 0.45);
-        const color = ring.side === 'left'
-          ? `rgba(140, 200, 255, ${alpha})`
-          : `rgba(255, 180, 120, ${alpha})`;
-        ctx.save();
-        if (ring.side === 'left') {
-          ctx.beginPath();
-          ctx.rect(0, 0, mid, h);
-          ctx.clip();
-        } else {
-          ctx.beginPath();
-          ctx.rect(mid, 0, mid, h);
-          ctx.clip();
+    resolveMazeWalls(ball, labyrinth) {
+      const tileSize = labyrinth.tileSize;
+      const col = Math.floor(ball.x / tileSize);
+      const row = Math.floor(ball.y / tileSize);
+      const neighbors = [
+        { dc: -1, dr: 0 },
+        { dc: 1, dr: 0 },
+        { dc: 0, dr: -1 },
+        { dc: 0, dr: 1 },
+        { dc: -1, dr: -1 },
+        { dc: 1, dr: -1 },
+        { dc: -1, dr: 1 },
+        { dc: 1, dr: 1 }
+      ];
+      neighbors.forEach(({ dc, dr }) => {
+        const nCol = col + dc;
+        const nRow = row + dr;
+        const tile = labyrinth.getTile(nCol, nRow);
+        if (!tile || tile.type !== 'wall') return;
+        const minX = nCol * tileSize;
+        const minY = nRow * tileSize;
+        const maxX = minX + tileSize;
+        const maxY = minY + tileSize;
+        const nearestX = clamp(ball.x, minX, maxX);
+        const nearestY = clamp(ball.y, minY, maxY);
+        const dx = ball.x - nearestX;
+        const dy = ball.y - nearestY;
+        const dist = Math.hypot(dx, dy);
+        if (dist < ball.radius) {
+          const nx = dx / (dist || 1);
+          const ny = dy / (dist || 1);
+          const overlap = ball.radius - dist;
+          ball.x += nx * overlap;
+          ball.y += ny * overlap;
+          const vn = ball.vx * nx + ball.vy * ny;
+          if (vn < 0) {
+            ball.vx -= (1.2 * vn) * nx;
+            ball.vy -= (1.2 * vn) * ny;
+          }
         }
-        ctx.strokeStyle = color;
-        ctx.lineWidth = Math.max(6, ring.strength * 24);
-        ctx.beginPath();
-        ctx.arc(ring.centerX, h / 2, ring.radius, 0, TWO_PI);
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // Left bar
-      ctx.fillStyle = `rgba(120, 190, 255, ${0.35 + leftIntensity * 0.45})`;
-      drawRoundedRect(ctx, mid - barWidth - pad, pad, barWidth * leftIntensity + pad * 0.6, h - pad * 2, radius);
-
-      // Right bar
-      ctx.fillStyle = `rgba(255, 170, 120, ${0.35 + rightIntensity * 0.45})`;
-      drawRoundedRect(ctx, mid + pad - pad * 0.6, pad, barWidth * rightIntensity + pad * 0.6, h - pad * 2, radius);
-
-      // Center divider
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(mid, pad * 0.7);
-      ctx.lineTo(mid, h - pad * 0.7);
-      ctx.stroke();
-
-      // Gauge
-      const gaugeWidth = Math.max(120, w * 0.4);
-      const gaugeHeight = Math.max(12, h * 0.025);
-      const gaugeX = mid - gaugeWidth / 2;
-      const gaugeY = h / 2 - gaugeHeight / 2;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-      drawRoundedRect(ctx, gaugeX, gaugeY, gaugeWidth, gaugeHeight, gaugeHeight / 2);
-      const normalized = clamp(this.lastDelta / this.maxImpulse, -1, 1);
-      if (Math.abs(normalized) > 0.02) {
-        const fillWidth = (gaugeWidth / 2) * Math.abs(normalized);
-        const fillX = normalized >= 0 ? mid : mid - fillWidth;
-        ctx.fillStyle = normalized >= 0
-          ? `rgba(255, 160, 96, ${0.6 + 0.4 * Math.abs(normalized)})`
-          : `rgba(120, 190, 255, ${0.6 + 0.4 * Math.abs(normalized)})`;
-        drawRoundedRect(ctx, fillX, gaugeY, fillWidth, gaugeHeight, gaugeHeight / 2);
-      }
-
-      // Labels
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.font = `${Math.round(Math.max(20, w * 0.06))}px "Doto", sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText('Knock Monitor', mid, pad + Math.max(24, w * 0.08));
-
-      ctx.font = `${Math.round(Math.max(16, w * 0.04))}px "Doto", sans-serif`;
-      ctx.fillStyle = 'rgba(160, 200, 255, 0.85)';
-      ctx.textAlign = 'left';
-      ctx.fillText('Left hull', pad * 0.6, h - pad * 0.6);
-      ctx.textAlign = 'right';
-      ctx.fillStyle = 'rgba(255, 190, 150, 0.85)';
-      ctx.fillText('Right hull', w - pad * 0.6, h - pad * 0.6);
+      });
     }
 
-    loop(timestamp) {
+    applyPickups() {
+      const { ball } = this;
+      this.labyrinth.pickups = this.labyrinth.pickups.filter(p => {
+        const dx = ball.x - p.x;
+        const dy = ball.y - p.y;
+        if (dx * dx + dy * dy < (ball.radius + p.radius) ** 2) {
+          const original = ball.radius;
+          ball.radius = clamp(original * p.scale, 12, 48);
+          this.updateStatus(p.scale > 1 ? 'Ball grew heavier!' : 'Ball shrank, becoming nimble.');
+          ball.vx *= 0.6;
+          ball.vy *= 0.6;
+          return false;
+        }
+        return true;
+      });
+    }
+
+    drawFloorPattern(ctx, tileSize) {
+      const spacing = tileSize / 5;
+      ctx.strokeStyle = FLOOR_PATTERN_COLOR;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = 0; x <= tileSize; x += spacing) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, tileSize);
+      }
+      for (let y = 0; y <= tileSize; y += spacing) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(tileSize, y);
+      }
+      ctx.stroke();
+    }
+
+    render() {
+      const ctx = this.ctx;
+      ctx.clearRect(0, 0, this.logicalWidth, this.logicalHeight);
+      ctx.save();
+      ctx.translate(-this.camera.x, -this.camera.y);
+
+      ctx.fillStyle = '#0d1423';
+      ctx.fillRect(this.camera.x, this.camera.y, this.logicalWidth, this.logicalHeight);
+
+      const tileSize = this.labyrinth.tileSize;
+      const startCol = Math.max(0, Math.floor(this.camera.x / tileSize) - 1);
+      const endCol = Math.min(this.labyrinth.cols, Math.ceil((this.camera.x + this.logicalWidth) / tileSize) + 1);
+      const startRow = Math.max(0, Math.floor(this.camera.y / tileSize) - 1);
+      const endRow = Math.min(this.labyrinth.rows, Math.ceil((this.camera.y + this.logicalHeight) / tileSize) + 1);
+
+      for (let row = startRow; row < endRow; row++) {
+        for (let col = startCol; col < endCol; col++) {
+          const tile = this.labyrinth.getTile(col, row);
+          if (!tile) continue;
+          const x = col * tileSize;
+          const y = row * tileSize;
+          if (tile.type === 'wall') {
+            ctx.fillStyle = '#05070d';
+            ctx.fillRect(x, y, tileSize, tileSize);
+          } else {
+            const surface = SURFACES[tile.surface] || SURFACES.normal;
+            ctx.fillStyle = surface.color;
+            ctx.fillRect(x, y, tileSize, tileSize);
+            ctx.save();
+            ctx.translate(x, y);
+            this.drawFloorPattern(ctx, tileSize);
+            ctx.restore();
+            if (tile.requiredOrientation) {
+              ctx.save();
+              ctx.translate(x + tileSize / 2, y + tileSize / 2);
+              ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+              ctx.lineWidth = 4;
+              ctx.beginPath();
+              if (tile.requiredOrientation === 'vertical') {
+                ctx.moveTo(0, -tileSize * 0.35);
+                ctx.lineTo(0, tileSize * 0.35);
+              } else {
+                ctx.moveTo(-tileSize * 0.35, 0);
+                ctx.lineTo(tileSize * 0.35, 0);
+              }
+              ctx.stroke();
+              ctx.restore();
+            }
+          }
+        }
+      }
+
+      this.labyrinth.dynamicElements.forEach(el => el.render(ctx, this.camera));
+
+      this.labyrinth.pickups.forEach(p => {
+        ctx.save();
+        ctx.translate(p.x - this.camera.x, p.y - this.camera.y);
+        ctx.fillStyle = 'rgba(255,255,255,0.75)';
+        ctx.beginPath();
+        ctx.arc(0, 0, p.radius, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(40,120,255,0.9)';
+        ctx.font = `${p.radius * 1.2}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(p.scale > 1 ? '+' : '-', 0, 0);
+        ctx.restore();
+      });
+
+      const ballScreenX = this.ball.x - this.camera.x;
+      const ballScreenY = this.ball.y - this.camera.y - this.ball.z * 0.4;
+      ctx.save();
+      ctx.translate(ballScreenX, ballScreenY);
+      const radial = ctx.createRadialGradient(-this.ball.radius * 0.4, -this.ball.radius * 0.6, this.ball.radius * 0.2,
+        this.ball.radius * 0.2, this.ball.radius * 0.2, this.ball.radius);
+      radial.addColorStop(0, '#ff5959');
+      radial.addColorStop(1, '#850909');
+      ctx.fillStyle = radial;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.ball.radius, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#f5f5f5';
+      const dotOffset = rotateVector(0, -this.ball.radius * 0.6, this.ball.rollAngle);
+      ctx.beginPath();
+      ctx.arc(dotOffset.x, dotOffset.y, this.ball.radius * 0.18, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.restore();
+    }
+
+    loop(now) {
       if (!this.running) return;
-      const dt = Math.min(0.05, (timestamp - this.lastTime) / 1000 || 0.016);
-      this.lastTime = timestamp;
+      const dt = clamp((now - this.lastTime) / 1000, 0.001, 0.05);
+      this.lastTime = now;
       this.update(dt);
-      this.draw();
+      this.render();
+      this.updateStatus();
       this.raf = requestAnimationFrame(this.loop);
     }
   }
