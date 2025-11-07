@@ -46,6 +46,11 @@ const portalScreen = document.getElementById('portalScreen');
 const portalCanvas = document.getElementById('portalCanvas');
 const portalStatus = document.getElementById('portalStatus');
 const portalBack = document.getElementById('portalBack');
+const labyrinthBtn = document.getElementById('labyrinthBtn');
+const labyrinthScreen = document.getElementById('labyrinthScreen');
+const labyrinthCanvas = document.getElementById('labyrinthCanvas');
+const labyrinthStatus = document.getElementById('labyrinthStatus');
+const labyrinthBack = document.getElementById('labyrinthBack');
 
 const mobileControls = document.getElementById('mobileControls');
 const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -283,6 +288,7 @@ function renderStars(timestamp) {
 
 let creditsInterval;
 let portalExperience = null;
+let labyrinthExperience = null;
 let game;
 
 if (isMobile) {
@@ -507,6 +513,41 @@ function hidePortalExperience() {
   portalScreen.classList.add('hidden');
 }
 
+function stopLabyrinthGame() {
+  if (labyrinthExperience) {
+    labyrinthExperience.stop();
+  }
+}
+
+function hideLabyrinthExperience() {
+  stopLabyrinthGame();
+  labyrinthScreen.classList.add('hidden');
+}
+
+async function showLabyrinthExperience() {
+  hideCredits();
+  hideScreens();
+  labyrinthScreen.classList.remove('hidden');
+  try {
+    if (window.ensureLabyrinthGame) {
+      await window.ensureLabyrinthGame();
+    }
+    if (typeof LabyrinthGame === 'undefined') {
+      throw new Error('Labyrinth module missing.');
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Nie udało się uruchomić labiryntu. Odśwież stronę i spróbuj ponownie.');
+    showCredits();
+    return;
+  }
+
+  if (!labyrinthExperience) {
+    labyrinthExperience = new LabyrinthGame(labyrinthCanvas, labyrinthStatus);
+  }
+  labyrinthExperience.start();
+}
+
 function hideScreens() {
   cancelAnimationFrame(starAnim);
   if (menuMusic) menuMusic.pause();
@@ -517,8 +558,10 @@ function hideScreens() {
   aboutScreen.classList.add('hidden');
   creditsScreen.classList.add('hidden');
   portalScreen.classList.add('hidden');
+  labyrinthScreen.classList.add('hidden');
   resumeBtn.classList.add('hidden');
   stopPortalExperience();
+  stopLabyrinthGame();
 }
 
 function showMenu() {
@@ -758,6 +801,7 @@ controlsBtn.onclick = showControls;
 aboutBtn.onclick = showAbout;
 creditsBtn.onclick = showCredits;
 portalTrigger.onclick = showPortalExperience;
+labyrinthBtn.onclick = showLabyrinthExperience;
 singleBtn.onclick = startGame;
 hostBtn.onclick = startHost;
 joinBtn.onclick = startJoin;
@@ -784,8 +828,9 @@ controlsBack.onclick = () => { showMenu(); };
 aboutBack.onclick = () => { showMenu(); };
 creditsBack.onclick = () => { hideCredits(); showMenu(); };
 portalBack.onclick = () => { hidePortalExperience(); showCredits(); };
+labyrinthBack.onclick = () => { hideLabyrinthExperience(); showCredits(); };
 
-[newGameBtn, settingsBtn, controlsBtn, aboutBtn, creditsBtn, portalTrigger, backBtn, controlsBack, aboutBack, creditsBack, portalBack, resetBtn, singleBtn, hostBtn, joinBtn, resumeBtn].forEach(btn => {
+[newGameBtn, settingsBtn, controlsBtn, aboutBtn, creditsBtn, portalTrigger, labyrinthBtn, backBtn, controlsBack, aboutBack, creditsBack, portalBack, labyrinthBack, resetBtn, singleBtn, hostBtn, joinBtn, resumeBtn].forEach(btn => {
   btn.addEventListener('mouseenter', () => playTone(880, 0.05));
 });
 

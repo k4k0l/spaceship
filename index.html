@@ -80,6 +80,21 @@
       transform: scale(0.75);
       transform-origin: bottom right;
     }
+    #labyrinthCanvas {
+      width: min(420px, 90vw);
+      height: min(680px, 80vh);
+      max-width: 90vw;
+      max-height: 80vh;
+      background: rgba(0,0,0,0.2);
+      border-radius: 24px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.45);
+    }
+    .labyrinth-status {
+      max-width: 520px;
+      padding: 0 24px;
+      line-height: 1.5;
+      font-size: 20px;
+    }
   </style>
 </head>
 <body>
@@ -169,6 +184,7 @@
   <div id="creditsScreen" class="screen hidden">
     <h2>Credits</h2>
     <p>Created with help of OpenAI Codex</p>
+    <button id="labyrinthBtn">Easter Egg</button>
     <button id="portalTrigger" class="portal-trigger" aria-label="Activate secret portal"><span class="visually-hidden">Activate secret portal</span></button>
     <button id="creditsBack">Back</button>
   </div>
@@ -183,6 +199,13 @@
     <button id="portalBack">Powrót do kredytów</button>
   </div>
 
+  <div id="labyrinthScreen" class="screen hidden">
+    <h2>Labirynt Kulki</h2>
+    <canvas id="labyrinthCanvas" width="420" height="680"></canvas>
+    <p id="labyrinthStatus" class="labyrinth-status">Przechyl urządzenie, by wprawić kulkę w ruch.</p>
+    <button id="labyrinthBack">Powrót do kredytów</button>
+  </div>
+
   <div id="footer"><strong id="footerVersion">Version</strong></div>
 
   <script src="https://fraigo.github.io/javascript-midi-player/midiplayer/WebAudioFontPlayer.js"></script>
@@ -194,6 +217,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
   <script src="game.js"></script>
   <script src="knock.js"></script>
+  <script src="labyrinth.js"></script>
   <script src="main.js"></script>
 </body>
 </html>
