@@ -10,9 +10,9 @@ const DEG = 180 / Math.PI;
 
 const DEFAULTS = {
   boardPadding: 36,
-  gravityStrength: 1150,
-  velocityDamping: 1.85,
-  tiltResponse: 7.5,
+  gravityStrength: 1450,
+  velocityDamping: 2.1,
+  tiltResponse: 16,
   manualReturn: 1.6,
   pointerSensitivity: 0.014,
   elasticity: 0.78,
@@ -70,7 +70,7 @@ export class LabyrinthGame {
     this.resize();
     this.resetBall();
     this.render();
-    this.updateStatus('Dotknij lub porusz urządzeniem, by przejąć kontrolę nad kulką. Ustaw telefon w wygodnej pozycji i wybierz „Kalibruj orientację”, aby ustawić punkt odniesienia.');
+    this.updateStatus('Dotknij planszy lub przechyl urządzenie, by przejąć kontrolę nad kulką. Gdy obraz wydaje się przekrzywiony, skorzystaj z „Kalibruj orientację”.');
   }
 
   resetOrientationState() {
@@ -85,7 +85,7 @@ export class LabyrinthGame {
     this.sensorManager.reset();
     this.sensorManager.requestPermissions().catch(() => {});
     this.resetOrientationState();
-    this.updateStatus('Zerowano odniesienie żyroskopu. Trzymaj urządzenie nieruchomo przez chwilę.');
+    this.updateStatus('Orientacja wyzerowana. Trzymaj urządzenie nieruchomo przez chwilę.');
   }
 
   dispose() {
@@ -262,7 +262,8 @@ export class LabyrinthGame {
       this.inverseQuaternion.copy(this.orientationQuaternion).invert();
       this.localGravity.copy(this.worldGravity).applyQuaternion(this.inverseQuaternion);
       targetX = THREE.MathUtils.clamp(this.localGravity.x, -1.2, 1.2);
-      targetY = THREE.MathUtils.clamp(this.localGravity.y, -1.2, 1.2);
+      const rawY = -this.localGravity.y;
+      targetY = THREE.MathUtils.clamp(rawY, -1.2, 1.2);
     } else {
       targetX = this.manualTilt.x;
       targetY = this.manualTilt.y;
@@ -458,23 +459,22 @@ export class LabyrinthGame {
     const degY = Math.asin(tiltY) * DEG;
 
     const parts = [
-      `Nachylenie: X ${degX.toFixed(1)}° / Y ${degY.toFixed(1)}°`,
-      `Prędkość kulki: ${speed.toFixed(1)} px/s`,
-      `Sprężystość ścian: ${(this.settings.elasticity).toFixed(2)}`
+      `Nachylenie X ${degX.toFixed(0)}° / Y ${degY.toFixed(0)}°`,
+      `Prędkość ${speed.toFixed(0)} px/s`
     ];
 
     if (state.hasOrientation) {
-      parts.push('Sterowanie: żyroskop');
+      parts.push('Sterowanie żyroskopem');
     } else if (state.permissionState === 'prompt') {
-      parts.push('Sterowanie: dotyk/klawiatura (udziel dostępu do czujników, aby użyć żyroskopu).');
+      parts.push('Dotknij planszy, by udzielić dostępu do czujników.');
     } else if (state.permissionState === 'denied') {
-      parts.push('Sterowanie: dotyk/klawiatura (brak dostępu do czujników).');
+      parts.push('Sterowanie dotykiem lub klawiaturą (brak dostępu do czujników).');
     } else {
-      parts.push('Sterowanie: dotyk/klawiatura');
+      parts.push('Sterowanie dotykiem lub klawiaturą');
     }
 
     if (state.orientationAllowed && state.permissionState !== 'denied') {
-      parts.push('Kalibracja: ustaw urządzenie prosto i użyj przycisku „Kalibruj orientację” lub klawisza C.');
+      parts.push('Przycisk „Kalibruj” zeruje orientację.');
     }
 
     if (extra) {
