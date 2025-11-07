@@ -55,6 +55,57 @@ const labyrinthBack = document.getElementById('labyrinthBack');
 const mobileControls = document.getElementById('mobileControls');
 const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
+let sensorPermissionRequest = null;
+
+function promptForSensorAccess() {
+  if (sensorPermissionRequest) {
+    return sensorPermissionRequest;
+  }
+
+  const needsOrientationPermission = typeof DeviceOrientationEvent !== 'undefined'
+    && typeof DeviceOrientationEvent.requestPermission === 'function';
+  const needsMotionPermission = typeof DeviceMotionEvent !== 'undefined'
+    && typeof DeviceMotionEvent.requestPermission === 'function';
+
+  if (!needsOrientationPermission && !needsMotionPermission) {
+    return null;
+  }
+
+  const requests = [];
+
+  if (needsOrientationPermission) {
+    try {
+      requests.push(DeviceOrientationEvent.requestPermission().catch(err => {
+        console.warn('Orientation permission prompt failed', err);
+        return 'denied';
+      }));
+    } catch (err) {
+      console.warn('Orientation permission prompt failed', err);
+    }
+  }
+
+  if (needsMotionPermission) {
+    try {
+      requests.push(DeviceMotionEvent.requestPermission().catch(err => {
+        console.warn('Motion permission prompt failed', err);
+        return 'denied';
+      }));
+    } catch (err) {
+      console.warn('Motion permission prompt failed', err);
+    }
+  }
+
+  if (!requests.length) {
+    return null;
+  }
+
+  sensorPermissionRequest = Promise.all(requests).finally(() => {
+    sensorPermissionRequest = null;
+  });
+
+  return sensorPermissionRequest;
+}
+
 const settingsText = document.getElementById('settingsText');
 const resetBtn = document.getElementById('resetBtn');
 const menuStars = document.getElementById('menuStars');
@@ -495,6 +546,7 @@ function stopPortalExperience() {
 }
 
 function showPortalExperience() {
+  promptForSensorAccess();
   setGameActive(false);
   hideCredits();
   hideScreens();
@@ -530,6 +582,7 @@ function hideLabyrinthExperience() {
 }
 
 async function showLabyrinthExperience() {
+  promptForSensorAccess();
   setGameActive(false);
   hideCredits();
   hideScreens();

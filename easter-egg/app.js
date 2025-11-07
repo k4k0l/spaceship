@@ -124,6 +124,7 @@ export class PocketRealityPortal {
 
     this.sensorManager.reset();
     this.sensorManager.start();
+    this.sensorManager.requestPermissions().catch(() => {});
     this.controls.start(this.initialPosition);
 
     this.resize();
