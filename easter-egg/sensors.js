@@ -175,7 +175,6 @@ export function createSensorManager(THREE, options = {}) {
       if (orientationGranted) {
         attachOrientationListener();
       } else {
-        orientationAllowed = false;
         detachOrientationListener();
       }
 
@@ -191,7 +190,6 @@ export function createSensorManager(THREE, options = {}) {
       if (motionGranted) {
         attachMotionListener();
       } else {
-        motionAllowed = false;
         detachMotionListener();
       }
 
