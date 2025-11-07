@@ -195,6 +195,10 @@ function applyGameSettings(cfg) {
   Game.ENEMY_DETECTION_RADIUS = parseFloat(cfg.enemyDetection) || Game.ENEMY_DETECTION_RADIUS;
 }
 
+function setGameActive(active) {
+  document.body.classList.toggle('game-active', !!active);
+}
+
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
 
@@ -491,6 +495,7 @@ function stopPortalExperience() {
 }
 
 function showPortalExperience() {
+  setGameActive(false);
   hideCredits();
   hideScreens();
   if (window.ensurePocketRealityPortal) {
@@ -525,6 +530,7 @@ function hideLabyrinthExperience() {
 }
 
 async function showLabyrinthExperience() {
+  setGameActive(false);
   hideCredits();
   hideScreens();
   labyrinthScreen.classList.remove('hidden');
@@ -565,6 +571,7 @@ function hideScreens() {
 }
 
 function showMenu() {
+  setGameActive(false);
   hideScreens();
   menu.classList.remove('hidden');
   if (game && game.paused) {
@@ -589,11 +596,13 @@ function showMenu() {
 }
 
 function showModeScreen() {
+  setGameActive(false);
   hideScreens();
   modeScreen.classList.remove('hidden');
 }
 
 function showSettings() {
+  setGameActive(false);
   hideScreens();
   settingsScreen.classList.remove('hidden');
   if (!editor) {
@@ -617,16 +626,19 @@ function showSettings() {
 }
 
 function showControls() {
+  setGameActive(false);
   hideScreens();
   controlsScreen.classList.remove('hidden');
 }
 
 function showAbout() {
+  setGameActive(false);
   hideScreens();
   aboutScreen.classList.remove('hidden');
 }
 
 function showCredits() {
+  setGameActive(false);
   hideScreens();
   creditsScreen.classList.remove('hidden');
   creditsInterval = setInterval(() => {
@@ -640,6 +652,7 @@ function hideCredits() {
 }
 
 async function startGame() {
+  setGameActive(true);
   hideCredits();
   hideScreens();
   if (isMobile) mobileControls.classList.remove('hidden');
@@ -660,6 +673,7 @@ async function startGame() {
     cfg = parseJSONC(cfgText);
   } catch (e) {
     alert('B\u0142\u0119dny format ustawie\u0144!');
+    setGameActive(false);
     showSettings();
     return;
   }
@@ -807,6 +821,7 @@ hostBtn.onclick = startHost;
 joinBtn.onclick = startJoin;
 resumeBtn.onclick = () => {
   hideScreens();
+  setGameActive(true);
   if (game) { game.paused = false; game.setStatus('In game'); }
 };
 backBtn.onclick = () => {
