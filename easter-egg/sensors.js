@@ -266,6 +266,9 @@ export function createSensorManager(THREE, options = {}) {
     getState,
     get deviceQuaternion() {
       return deviceQuaternion;
+    },
+    get absoluteQuaternion() {
+      return absoluteQuaternion;
     }
   };
 }
