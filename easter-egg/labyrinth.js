@@ -40,6 +40,8 @@ export class LabyrinthGame {
     this.tiltSmooth = new THREE.Vector2();
     this.manualTilt = new THREE.Vector2();
 
+    this.resetOrientationState();
+
     this.ballPosition = new THREE.Vector2();
     this.ballVelocity = new THREE.Vector2();
     this.ballRadius = 18;
@@ -68,7 +70,22 @@ export class LabyrinthGame {
     this.resize();
     this.resetBall();
     this.render();
-    this.updateStatus('Dotknij lub porusz urządzeniem, by przejąć kontrolę nad kulką.');
+    this.updateStatus('Dotknij lub porusz urządzeniem, by przejąć kontrolę nad kulką. Ustaw telefon w wygodnej pozycji i wybierz „Kalibruj orientację”, aby ustawić punkt odniesienia.');
+  }
+
+  resetOrientationState() {
+    this.orientationQuaternion.identity();
+    this.inverseQuaternion.identity();
+    this.manualTilt.set(0, 0);
+    this.tiltTarget.set(0, 0);
+    this.tiltSmooth.set(0, 0);
+  }
+
+  calibrateOrientation() {
+    this.sensorManager.reset();
+    this.sensorManager.requestPermissions().catch(() => {});
+    this.resetOrientationState();
+    this.updateStatus('Zerowano odniesienie żyroskopu. Trzymaj urządzenie nieruchomo przez chwilę.');
   }
 
   dispose() {
@@ -79,9 +96,14 @@ export class LabyrinthGame {
   }
 
   handleOrientation() {
-    const absolute = this.sensorManager.absoluteQuaternion;
-    if (absolute) {
-      this.orientationQuaternion.copy(absolute);
+    const state = this.sensorManager.getState();
+    if (!state.hasOrientation) {
+      return;
+    }
+
+    const relative = this.sensorManager.deviceQuaternion;
+    if (relative) {
+      this.orientationQuaternion.copy(relative);
     }
   }
 
@@ -89,6 +111,7 @@ export class LabyrinthGame {
     if (this.running) return;
     this.running = true;
     this.sensorManager.reset();
+    this.resetOrientationState();
     this.sensorManager.start();
     this.sensorManager.requestPermissions().catch(() => {});
     this.resetBall();
@@ -101,9 +124,6 @@ export class LabyrinthGame {
     this.canvas.addEventListener('pointermove', this.boundPointerMove);
     this.canvas.addEventListener('pointerup', this.boundPointerUp);
     this.canvas.addEventListener('pointercancel', this.boundPointerUp);
-    this.manualTilt.set(0, 0);
-    this.tiltTarget.set(0, 0);
-    this.tiltSmooth.set(0, 0);
     this.animationFrame = requestAnimationFrame(this.boundAnimate);
     this.updateStatus();
   }
@@ -190,6 +210,11 @@ export class LabyrinthGame {
 
   handleKeyDown(event) {
     const key = event.key.toLowerCase();
+    if (key === 'c') {
+      this.calibrateOrientation();
+      event.preventDefault();
+      return;
+    }
     if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(key)) {
       this.activeKeys.add(key);
       event.preventDefault();
@@ -446,6 +471,10 @@ export class LabyrinthGame {
       parts.push('Sterowanie: dotyk/klawiatura (brak dostępu do czujników).');
     } else {
       parts.push('Sterowanie: dotyk/klawiatura');
+    }
+
+    if (state.orientationAllowed && state.permissionState !== 'denied') {
+      parts.push('Kalibracja: ustaw urządzenie prosto i użyj przycisku „Kalibruj orientację” lub klawisza C.');
     }
 
     if (extra) {

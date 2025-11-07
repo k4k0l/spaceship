@@ -51,6 +51,7 @@ const labyrinthScreen = document.getElementById('labyrinthScreen');
 const labyrinthCanvas = document.getElementById('labyrinthCanvas');
 const labyrinthStatus = document.getElementById('labyrinthStatus');
 const labyrinthBack = document.getElementById('labyrinthBack');
+const labyrinthCalibrate = document.getElementById('labyrinthCalibrate');
 
 const mobileControls = document.getElementById('mobileControls');
 const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -897,8 +898,15 @@ aboutBack.onclick = () => { showMenu(); };
 creditsBack.onclick = () => { hideCredits(); showMenu(); };
 portalBack.onclick = () => { hidePortalExperience(); showCredits(); };
 labyrinthBack.onclick = () => { hideLabyrinthExperience(); showCredits(); };
+labyrinthCalibrate.onclick = () => {
+  if (labyrinthExperience) {
+    labyrinthExperience.calibrateOrientation();
+  } else {
+    promptForSensorAccess();
+  }
+};
 
-[newGameBtn, settingsBtn, controlsBtn, aboutBtn, creditsBtn, portalTrigger, labyrinthBtn, backBtn, controlsBack, aboutBack, creditsBack, portalBack, labyrinthBack, resetBtn, singleBtn, hostBtn, joinBtn, resumeBtn].forEach(btn => {
+[newGameBtn, settingsBtn, controlsBtn, aboutBtn, creditsBtn, portalTrigger, labyrinthBtn, backBtn, controlsBack, aboutBack, creditsBack, portalBack, labyrinthBack, labyrinthCalibrate, resetBtn, singleBtn, hostBtn, joinBtn, resumeBtn].forEach(btn => {
   btn.addEventListener('mouseenter', () => playTone(880, 0.05));
 });
 
