@@ -78,8 +78,11 @@ export class LabyrinthGame {
     }
   }
 
-  handleOrientation(quaternion) {
-    this.orientationQuaternion.copy(quaternion);
+  handleOrientation() {
+    const absolute = this.sensorManager.absoluteQuaternion;
+    if (absolute) {
+      this.orientationQuaternion.copy(absolute);
+    }
   }
 
   start() {
