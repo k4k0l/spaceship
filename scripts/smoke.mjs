@@ -1,106 +1,17 @@
 import { chromium } from 'playwright';
-import { mkdir } from 'node:fs/promises';
-import { resolve } from 'node:path';
-
-const screenshotRoot = resolve(process.env.SCREENSHOT_DIR || 'artifacts/screenshots');
-await mkdir(screenshotRoot, { recursive: true });
-
-const browser = await chromium.launch({ headless: true });
-const profiles = [
-  ['desktop', { width: 1366, height: 768 }, false],
-  ['mobile', { width: 390, height: 844 }, true],
-].filter(([name]) => !process.argv[2] || name === process.argv[2]);
-
-for (const [name, viewport, mobile] of profiles) {
-  const page = await browser.newPage({ viewportSize: viewport, isMobile: mobile, hasTouch: mobile });
-  const errors = [];
-  page.on('console', message => {
-    if (message.type() === 'error') errors.push(message.text());
-  });
-  page.on('pageerror', error => errors.push(error.message));
-  await page.goto('http://127.0.0.1:4173');
-
-  const shot = state => page.screenshot({ path: `${screenshotRoot}/${name}-${state}.png` });
-  await page.click('[data-go="contract"]');
-  await page.click('[data-go="briefing"]');
-  await shot('briefing');
-  await page.click('[data-go="playing"]');
-  await page.waitForTimeout(250);
-  await shot('safe-flight');
-
-  await page.evaluate(() => {
-    const app = window.orbitalApp;
-    const planet = app.m.planet;
-    Object.assign(app.state.ship, {
-      x: planet.x - planet.influence * 0.75,
-      y: planet.y,
-      vx: 150,
-      vy: 35,
-    });
-    app.state.gravityEntry = true;
-  });
-  await page.waitForTimeout(100);
-  await shot('gravity-entry');
-
-  await page.evaluate(() => {
-    const app = window.orbitalApp;
-    const planet = app.m.planet;
-    Object.assign(app.state.ship, {
-      x: planet.x - planet.radius - 80,
-      y: planet.y,
-      vx: 190,
-      vy: 0,
-    });
-  });
-  await page.waitForTimeout(100);
-  await shot('collision-warning');
-
-  await page.evaluate(() => {
-    const app = window.orbitalApp;
-    const station = app.m.stations[0];
-    Object.assign(app.state.ship, { x: station.x + 10, y: station.y, vx: 2, vy: 0 });
-    app.state.dockProgress = 0.5;
-  });
-  await page.waitForTimeout(100);
-  await shot('docking');
-
-  await page.evaluate(() => {
-    const app = window.orbitalApp;
-    app.state.completed = true;
-    app.state.cargo = 91;
-    app.state.slingshot = true;
-    app.show('summary');
-  });
-  await shot('summary');
-
-  await page.click('[data-go="briefing"]');
-  await page.click('[data-go="playing"]');
-  await page.keyboard.press('Escape');
-  await page.locator('#paused [data-go="playing"]').click();
-  await page.keyboard.press('Escape');
-  await page.locator('#paused [data-go="menu"]').click();
-
-  if (errors.length) throw new Error(`${name} console errors: ${errors.join('; ')}`);
-  console.log(`${name}: flow and 6 screenshots OK (${screenshotRoot})`);
-  await page.close();
-}
-
-if (!process.argv[2]) {
-  const classic = await browser.newPage({ viewportSize: { width: 1366, height: 768 } });
-  const classicErrors = [];
-  classic.on('pageerror', error => classicErrors.push(error.message));
-  await classic.goto('http://127.0.0.1:4173/classic.html#credits');
-  await classic.waitForTimeout(500);
-  if (!await classic.locator('#creditsScreen').isVisible()) {
-    throw new Error('Classic credits route did not open');
-  }
-  if (!await classic.locator('#labyrinthBtn').isVisible()
-    || !await classic.locator('#portalTrigger').isVisible()) {
-    throw new Error('Easter Egg triggers missing');
-  }
-  if (classicErrors.length) throw new Error(classicErrors.join('; '));
-  console.log('classic credits and Easter Egg triggers OK');
-  await classic.close();
-}
-
-await browser.close();
+import { mkdir,writeFile } from 'node:fs/promises';import { resolve } from 'node:path';
+const root=resolve(process.env.SCREENSHOT_DIR||'artifacts/screenshots/stage-2');await mkdir(root,{recursive:true});
+const browser=await chromium.launch({headless:true});const profiles=[['desktop',{width:1366,height:768},false],['mobile',{width:390,height:844},true]].filter(([name])=>!process.argv[2]||name===process.argv[2]);const results=[];
+for(const [name,viewport,mobile] of profiles){const page=await browser.newPage({viewportSize:viewport,isMobile:mobile,hasTouch:mobile,reducedMotion:'no-preference'}),errors=[];page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:4173');const shot=s=>page.screenshot({path:`${root}/${name}-${s}.png`});
+ await page.click('[data-go="contract"]');await shot('contracts');if(await page.locator('[data-contract]').count()!==3)throw Error('Contract selection must contain exactly three cards');await page.click('[data-contract="goose"]');await shot('briefing');await page.click('[data-go="playing"]');await page.waitForTimeout(250);await shot('safe-flight');
+ // Controlled visual fixtures only; mission completion itself is proven by the input-only node test.
+ await page.evaluate(()=>{const a=window.orbitalApp,p=a.m.planets[0];Object.assign(a.state.ship,{x:p.x-p.influence*.75,y:p.y,vx:150,vy:35});a.state.gravityEntry=true;});await page.waitForTimeout(80);await shot('gravity-route');
+ await page.evaluate(()=>{const a=window.orbitalApp,d=a.m.dust[0];Object.assign(a.state.ship,{x:d.x,y:d.y,vx:140,vy:0});a.state.dustLevel=1;});await page.waitForTimeout(80);await shot('dust-shortcut');
+ await page.evaluate(()=>{const a=window.orbitalApp,p=a.m.planets[1];Object.assign(a.state.ship,{x:p.x-p.radius-70,y:p.y,vx:190,vy:0});});await page.waitForTimeout(80);await shot('collision-warning');
+ await page.evaluate(()=>{const a=window.orbitalApp,s=a.m.stations[0];Object.assign(a.state.ship,{x:s.x+10,y:s.y,vx:2,vy:0});a.state.dockProgress=.58;});await page.waitForTimeout(100);await shot('docking');await page.waitForTimeout(150);if(await page.locator('#stationChoice').isVisible())await shot('station-decision');
+ if(await page.locator('#stationChoice').isVisible())await page.click('[data-decision="secure"]');await page.keyboard.press('Escape');await page.locator('#paused [data-go="playing"]').click();await page.keyboard.press('Escape');await page.locator('#paused [data-go="menu"]').click();
+ // Five retry lifecycles must retain one RAF and one input attachment.
+ for(let i=0;i<5;i++){await page.click('[data-go="contract"]');await page.click('[data-contract="jelly"]');await page.click('[data-go="playing"]');await page.waitForTimeout(35);const lifecycle=await page.evaluate(()=>({loop:!!orbitalApp.loop,listeners:orbitalApp.input.attachCount}));if(!lifecycle.loop||lifecycle.listeners!==1)throw Error(`retry ${i+1} lifecycle leak`);await page.keyboard.press('Escape');await page.locator('#paused [data-go="menu"]').click();}
+ await page.click('[data-go="contract"]');await page.click('[data-contract="singularity"]');await page.click('[data-go="playing"]');await page.waitForTimeout(40);await page.evaluate(()=>{const a=orbitalApp;a.state.completed=true;a.state.time=506;a.state.cargo=88;a.state.hull=76;a.state.slingshot=true;a.show('summary');});await shot('summary');if(errors.length)throw Error(`${name}: ${errors.join('; ')}`);results.push({profile:name,viewport,consoleErrors:0,screenshots:8,retries:5});await page.close();}
+if(!process.argv[2]){const reduced=await browser.newPage({viewportSize:{width:390,height:844},isMobile:true,hasTouch:true,reducedMotion:'reduce'});await reduced.goto('http://127.0.0.1:4173');await reduced.click('[data-go="contract"]');await reduced.screenshot({path:`${root}/mobile-reduced-contracts.png`});results.push({profile:'mobile-reduced',screenshot:1});await reduced.close();const classic=await browser.newPage({viewportSize:{width:1366,height:768}}),classicErrors=[];classic.on('pageerror',e=>classicErrors.push(e.message));await classic.goto('http://127.0.0.1:4173/classic.html#credits');await classic.waitForTimeout(400);if(!await classic.locator('#creditsScreen').isVisible()||!await classic.locator('#labyrinthBtn').isVisible()||!await classic.locator('#portalTrigger').isVisible())throw Error('Classic/Easter Egg regression');if(classicErrors.length)throw Error(classicErrors.join('; '));results.push({profile:'classic',credits:true,easterEggTriggers:2});await classic.close();}
+await writeFile(resolve('artifacts/stage-2-smoke.json'),JSON.stringify({runAt:new Date().toISOString(),results},null,2));console.log(JSON.stringify(results));await browser.close();

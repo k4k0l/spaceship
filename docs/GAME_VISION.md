@@ -465,7 +465,7 @@ Przed końcem każdej sesji odpowiedzieć `tak/nie` z dowodem:
 
 ## Stan realizacji — 2026-07-30
 
-**Etap 1 zaimplementowany technicznie; brama produktowa warunkowa.** Powstała deterministyczna misja `license-01`, rozdzielone moduły symulacji/misji/inputu/renderera/audio/storage/UI, pełny flow aplikacji, zapis kompatybilnego ghosta, zachowany tryb klasyczny i Easter Eggi oraz zestaw testów i generator 12 screenshotów desktop/mobile (binarne wyniki pozostają lokalnym artefaktem, poza Git). Szczegółowe komendy, wyniki i ograniczenie braku dziesięciu zewnętrznych playtestów opisuje `docs/playtests/stage-1-report.md`. Nie uznajemy metryk ludzkich za spełnione bez testerów; Etap 2 powinien zacząć się od ich weryfikacji i strojenia, nie od obchodzenia bramy.
+**Etap 2 zaimplementowany technicznie; bramy produktowe Etapów 1 i 2 pozostają warunkowe.** Etap 1 ponownie zweryfikowano i dodano dowód przejścia pełnej trasy samym inputem, bez teleportowania stanu. Nadal nie istnieje 10 niezależnych playtestów Etapu 1. `round-01` rozwija grę do czterech dostaw, dokładnie trzech kontraktów, dwóch planet, pyłu, trzech typów stacji i wyniku czas–integralność–styl–premia; zawiera lokalną telemetrię, narzędzia debug/replay, audio, dotyk i reduced motion. Automaty oraz własny test nie zastępują kryteriów 15 rund i fizycznego telefonu, dlatego Etapu 3 nie wolno rozpoczynać. Dowody i pełna lista oczekujących danych znajdują się w `docs/playtests/stage-1-report.md` oraz `docs/playtests/stage-2-report.md`.
 
 ## Prompty startowe dla kolejnych sesji
 
