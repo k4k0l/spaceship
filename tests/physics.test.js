@@ -61,7 +61,17 @@ test('time formatter produces stable mission clock', () => {
   assert.equal(Game.formatTime(65.9), '01:05');
 });
 
-test('v0.5 contracts have unique gameplay rules', () => {
+test('contracts have unique gameplay rules', () => {
   assert.equal(Game.CONTRACTS.length, 3);
   assert.equal(new Set(Game.CONTRACTS.map(contract => contract.rule)).size, 3);
+});
+
+test('campaign contains six distinct, playable routes', () => {
+  assert.equal(Game.MISSIONS.length, 6);
+  assert.equal(new Set(Game.MISSIONS.map(m => m.id)).size, 6);
+  for (const mission of Game.MISSIONS) {
+    assert.ok(mission.stations.length >= 2);
+    assert.ok(mission.asteroids >= 0);
+    assert.ok(Game.CONTRACTS.includes(mission.contract));
+  }
 });
