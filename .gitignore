@@ -1,0 +1,6 @@
+node_modules/
+npm-debug.log*
+
+# Playwright produces binary evidence locally; PR transport accepts text files only.
+artifacts/
+screenshots/

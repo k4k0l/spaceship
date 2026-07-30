@@ -640,12 +640,14 @@ function showMenu() {
   if (!introPlayed) { introPlayed = true; playIntroTune(); }
   initStarField();
   starAnim = requestAnimationFrame(renderStars);
-  if (!menuMusic) {
-    menuMusic = new MIDIPlayer(midiUrl);
-    menuMusic.autoReplay = true;
-    menuMusic.onload = () => menuMusic.play();
-  } else {
-    menuMusic.play();
+  if (typeof MIDIPlayer !== 'undefined') {
+    if (!menuMusic) {
+      menuMusic = new MIDIPlayer(midiUrl);
+      menuMusic.autoReplay = true;
+      menuMusic.onload = () => menuMusic.play();
+    } else {
+      menuMusic.play();
+    }
   }
 }
 
@@ -920,4 +922,12 @@ showMenu();
 const sessionParam = new URLSearchParams(location.search).get('session');
 if (sessionParam) {
   handleSessionLink(location.href);
+}
+
+// Preserve a direct route from the courier shell to the original credits and Easter Eggs.
+if (window.location.hash === '#credits') {
+  window.addEventListener('load', () => {
+    const creditsButton = document.getElementById('creditsBtn');
+    if (creditsButton) creditsButton.click();
+  }, { once: true });
 }
