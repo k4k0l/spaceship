@@ -10,8 +10,8 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Doto:wght@100..900&display=swap');
     body { margin: 0; background: #222; color: #fff; font-family: 'Doto', sans-serif; text-align: center; overflow: hidden; }
-    #wrapper { position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; transition: transform 0.3s ease; perspective: 800px; }
-    #game { background: #000; display: block; width: 100%; height: 100%; transform-origin: bottom center; transform: rotateX(30deg); }
+    #wrapper { position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; transition: transform 0.3s ease; }
+    #game { background: #000; display: block; width: 100%; height: 100%; }
     #sidebar { display: flex; flex-direction: row; align-items: flex-start; position: absolute; top: 0; left: 0; right: 0; background: rgba(0,0,0,0.5); padding: 8px 10px; border-radius: 0 0 8px 8px; }
     #topbar { display: flex; flex-direction: column; text-align: left; padding: 0 10px 0 0; box-sizing: border-box; }
     #topbar span { margin: 2px 0; display: inline-block; }
@@ -19,6 +19,8 @@
     h1 { margin-bottom: 5px; font-size: 48px; }
     #menuTitle { position: relative; z-index: 1; }
     button { font-family: 'Doto', sans-serif; font-size: 48px; margin: 10px; padding: 10px 20px; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .network-notice { max-width: 640px; margin: 4px 20px; color: #bbb; font: 700 16px/1.4 sans-serif; }
     #shareOverlay textarea { width: 80%; height: 80px; overflow: auto; }
     #shareOverlay button { font-size: 24px; margin: 5px; }
     #shareOverlay { z-index: 250; }
@@ -44,7 +46,7 @@
       pointer-events: none;
     }
     #swipeHandle.active { display: block; }
-    #mobileControls { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; pointer-events: auto; transform-origin: bottom center; transform: rotateX(30deg); transform-style: preserve-3d; }
+    #mobileControls { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; pointer-events: auto; }
     #joystick {
       position: absolute;
       width: 80px;
@@ -57,8 +59,6 @@
       margin-top: -40px;
       pointer-events: none;
       transition: opacity 0.1s;
-      transform-origin: bottom center;
-      transform: rotateX(30deg);
     }
     #joystick.active { background: rgba(255,255,255,0.2); }
     #stick {
@@ -72,8 +72,6 @@
       border-radius: 50%;
       background: rgba(255,255,255,0.2);
       pointer-events: none;
-      transform-origin: bottom center;
-      transform: rotateX(30deg);
     }
     body.mobile #topbar,
     body.mobile #minimap {
@@ -112,6 +110,7 @@
       <div id="topbar">
         <span id="score">Score: 00000</span>
         <span id="timer">Timer: [02:30]</span>
+        <span id="mission">Cargo: reach the first station</span>
         <span id="lives">Lives: |||||</span>
         <span id="armor">Armor: |||||</span>
         <span id="enemies">Enemies: 0</span>
@@ -151,8 +150,9 @@
   <div id="modeScreen" class="screen hidden">
     <h2>Select Mode</h2>
     <button id="singleBtn">Single Player</button>
-    <button id="hostBtn">Multiplayer (Create)</button>
-    <button id="joinBtn">Multiplayer (Join)</button>
+    <button id="hostBtn" disabled title="Signaling service is unavailable">Multiplayer Create (experimental)</button>
+    <button id="joinBtn" disabled title="Signaling service is unavailable">Multiplayer Join (experimental)</button>
+    <p class="network-notice">Online mode is temporarily unavailable while signaling is migrated from Google Sheets.</p>
   </div>
   <div id="settingsScreen" class="screen hidden">
     <h2>Settings</h2>

@@ -1,6 +1,6 @@
 
 const GAME_NAME = 'Asteroids';
-const GAME_VERSION = '0.3.1';
+const GAME_VERSION = '0.5.0';
 const SIGNALING_URL = 'https://script.google.com/macros/s/AKfycbxQPVHVEjrIjGfc-b7HfDdLcKjIdwHJPriR0marwKhDYbJIDI-XPVlk6qu_fAFdRpFC/exec';
 
 const canvas = document.getElementById('game');
@@ -139,13 +139,13 @@ const defaultSettingsText = `{
   "shipSize": 20,    // ship radius
   "shipMass": 5,     // ship mass
   "roundTime": 150,  // round time in seconds
-  "minAsteroids": 10, // minimum asteroids
-  "maxAsteroids": 100, // maximum asteroids
-  "maxPlanets": 3,   // maximum planets
-  "minEnemies": 3,   // minimum enemies
-  "maxEnemies": 10,  // maximum enemies
-  "gravityMultiplier": 0.5, // object mass multiplier
-  "planetGravityMultiplier": 8, // extra planet mass multiplier
+  "minAsteroids": 12, // minimum asteroids
+  "maxAsteroids": 24, // maximum asteroids
+  "maxPlanets": 2,   // maximum planets
+  "minEnemies": 0,   // minimum enemies
+  "maxEnemies": 0,  // maximum enemies
+  "gravityMultiplier": 0.3, // object mass multiplier
+  "planetGravityMultiplier": 5, // extra planet mass multiplier
   "bulletLife": 3, // bullet lifetime
   "shieldDuration": 30, // shield time in seconds
   "exhaustLife": 0.7, // exhaust particle life
@@ -640,11 +640,11 @@ function showMenu() {
   if (!introPlayed) { introPlayed = true; playIntroTune(); }
   initStarField();
   starAnim = requestAnimationFrame(renderStars);
-  if (!menuMusic) {
+  if (!menuMusic && typeof MIDIPlayer !== 'undefined') {
     menuMusic = new MIDIPlayer(midiUrl);
     menuMusic.autoReplay = true;
     menuMusic.onload = () => menuMusic.play();
-  } else {
+  } else if (menuMusic) {
     menuMusic.play();
   }
 }
@@ -706,6 +706,10 @@ function hideCredits() {
 }
 
 async function startGame() {
+  if (game) {
+    game.destroy();
+    game = null;
+  }
   setGameActive(true);
   hideCredits();
   hideScreens();
@@ -733,13 +737,14 @@ async function startGame() {
   }
   settingsData = generateSettingsText(cfg);
   applyGameSettings(cfg);
+  const numberOr = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
   const settings = {
     worldSize: parseInt(cfg.worldSize) || Game.WORLD_SIZE,
-    minAsteroids: parseInt(cfg.minAsteroids) || Game.MIN_INITIAL_ASTEROIDS,
-    maxAsteroids: parseInt(cfg.maxAsteroids) || Game.MAX_INITIAL_ASTEROIDS,
-    maxPlanets: parseInt(cfg.maxPlanets) || Game.MAX_PLANETS,
-    minEnemies: parseInt(cfg.minEnemies) || Game.MIN_ENEMIES,
-    maxEnemies: parseInt(cfg.maxEnemies) || Game.MAX_ENEMIES,
+    minAsteroids: numberOr(cfg.minAsteroids, Game.MIN_INITIAL_ASTEROIDS),
+    maxAsteroids: numberOr(cfg.maxAsteroids, Game.MAX_INITIAL_ASTEROIDS),
+    maxPlanets: numberOr(cfg.maxPlanets, Game.MAX_PLANETS),
+    minEnemies: numberOr(cfg.minEnemies, Game.MIN_ENEMIES),
+    maxEnemies: numberOr(cfg.maxEnemies, Game.MAX_ENEMIES),
     zoom: isMobile ? 0.8 : 1,
     isMobile,
     pingEl,

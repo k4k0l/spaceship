@@ -19,6 +19,7 @@ class Game {
     this.armorEl = armorEl;
     this.timerEl = timerEl;
     this.enemiesEl = enemiesEl;
+    this.missionEl = document.getElementById('mission');
     this.pingEl = settings.pingEl || null;
     this.isHost = settings.isHost || false;
     this.ping = 0;
@@ -43,6 +44,12 @@ class Game {
     this.exhaust = [];
     this.stars = [[], [], []];
     this.planets = [];
+    this.stations = [];
+    this.currentStation = 0;
+    this.deliveries = 0;
+    this.cargoIndex = 0;
+    this.cargoNames = ['one angry goose', 'still-warm space pizza', 'fragile antimatter', 'Wi-Fi for Pluto'];
+    this.deliveryCooldown = 0;
     // ensure enemies array exists before any spawns
     this.enemies = [];
     this.peerShip = null;
@@ -56,9 +63,9 @@ class Game {
     this.spawnInvul = 0;
     this.flashTimer = 0;
     this.lineFlashTimer = 0;
-    this.pickupTimer = 3 + Math.random() * 5;
-    this.healPickupTimer = 20 + Math.random() * 10;
-    this.timePickupTimer = 30 + Math.random() * 15;
+    this.pickupTimer = 18 + Math.random() * 8;
+    this.healPickupTimer = 35 + Math.random() * 15;
+    this.timePickupTimer = 45 + Math.random() * 20;
     this.lives = 5;
     this.armor = 5;
     this.score = 0;
@@ -69,6 +76,7 @@ class Game {
     this.timer = Game.ROUND_TIME;
     this.exhaustDelay = 0;
     this.lastTime = 0;
+    this.accumulator = 0;
 
     this.viewportX = 0;
     this.viewportY = 0;
@@ -82,8 +90,8 @@ class Game {
       radius: Game.DEFAULT_SHIP_RADIUS,
       mass: Game.DEFAULT_SHIP_MASS,
       thrust: {
-        x: Math.cos(startAngle) * 0.5,
-        y: Math.sin(startAngle) * 0.5
+        x: 0,
+        y: 0
       },
       canShoot: true,
       dead: false,
@@ -96,28 +104,36 @@ class Game {
     this.rotateTarget = 0;
 
     const getKey = Game.keyFromEvent;
-    window.addEventListener('keydown', e => {
+    this.onKeyDown = e => {
       const code = getKey(e);
-      if (code != null) this.keys[code] = true;
-    });
-    window.addEventListener('keyup', e => {
+      if (code != null) {
+        this.keys[code] = true;
+        if ([Game.KEY_LEFT, Game.KEY_RIGHT, Game.KEY_UP, Game.KEY_DOWN, Game.KEY_SPACE].includes(code)) e.preventDefault();
+      }
+    };
+    this.onKeyUp = e => {
       const code = getKey(e);
       if (code != null) this.keys[code] = false;
-    });
-    window.addEventListener('resize', () => this.resizeCanvas());
+    };
+    this.onResize = () => this.resizeCanvas();
+    window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('keyup', this.onKeyUp);
+    window.addEventListener('resize', this.onResize);
     this.resizeCanvas();
     this.createStars();
     this.updateTimer();
-    this.minAsteroids = settings.minAsteroids || Game.MIN_INITIAL_ASTEROIDS;
-    this.maxAsteroids = settings.maxAsteroids || Game.MAX_INITIAL_ASTEROIDS;
-    this.maxPlanets = settings.maxPlanets || Game.MAX_PLANETS;
-    this.minEnemies = settings.minEnemies || Game.MIN_ENEMIES;
-    this.maxEnemies = settings.maxEnemies || Game.MAX_ENEMIES;
-    this.spawnInitialAsteroids(Math.floor(Math.random() * (this.maxAsteroids - this.minAsteroids + 1)) + this.minAsteroids);
+    this.minAsteroids = settings.minAsteroids ?? Game.MIN_INITIAL_ASTEROIDS;
+    this.maxAsteroids = settings.maxAsteroids ?? Game.MAX_INITIAL_ASTEROIDS;
+    this.maxPlanets = settings.maxPlanets ?? Game.MAX_PLANETS;
+    this.minEnemies = settings.minEnemies ?? Game.MIN_ENEMIES;
+    this.maxEnemies = settings.maxEnemies ?? Game.MAX_ENEMIES;
     this.spawnPlanets(this.maxPlanets);
+    this.createStations();
+    this.spawnInitialAsteroids(Math.floor(Math.random() * (this.maxAsteroids - this.minAsteroids + 1)) + this.minAsteroids);
     const enemyCount = Math.floor(Math.random() * (this.maxEnemies - this.minEnemies + 1)) + this.minEnemies;
     for (let i = 0; i < enemyCount; i++) this.spawnEnemy();
     this.updateTopbar();
+    this.updateMission();
   }
 
   /** Resize canvas to window size */
@@ -157,6 +173,12 @@ class Game {
     }
   }
 
+  updateMission(message) {
+    if (!this.missionEl) return;
+    const cargo = this.cargoNames[this.cargoIndex % this.cargoNames.length];
+    this.missionEl.textContent = message || `Cargo: ${cargo} → Station ${this.currentStation + 1} · delivered ${this.deliveries}`;
+  }
+
   setStatus(msg) {
     this.statusMessage = msg;
     this.updateTopbar();
@@ -185,14 +207,13 @@ class Game {
 
   /** Convert world coordinates to isometric screen coordinates */
   isoTransform(x, y) {
-    let dx = x - this.ship.x;
-    let dy = y - this.ship.y;
-    if (dx > this.worldWidth / 2) dx -= this.worldWidth;
-    if (dx < -this.worldWidth / 2) dx += this.worldWidth;
-    if (dy > this.worldHeight / 2) dy -= this.worldHeight;
-    if (dy < -this.worldHeight / 2) dy += this.worldHeight;
-    const ix = dx - dy;
-    const iy = (dx + dy) * this.isoScale;
+    const dx = Game.wrappedDelta(this.ship.x, x, this.worldWidth);
+    const dy = Game.wrappedDelta(this.ship.y, y, this.worldHeight);
+    // The game is rendered as a true top-down field. Keeping this transform as
+    // the single camera boundary prevents visual perspective from leaking into
+    // simulation coordinates.
+    const ix = dx;
+    const iy = dy;
     return {
       x: ix + this.canvas.width / 2,
       y: iy + this.canvas.height / 2
@@ -201,18 +222,12 @@ class Game {
 
   /** Convert a world angle to an isometric screen angle */
   isoAngle(angle) {
-    const dx = Math.cos(angle);
-    const dy = Math.sin(angle);
-    const ix = dx - dy;
-    const iy = (dx + dy) * this.isoScale;
-    return Math.atan2(iy, ix);
+    return angle;
   }
 
   /** Convert a screen delta in pixels to world delta */
   screenDeltaToWorld(dx, dy) {
-    const wx = (dx + dy / this.isoScale) / 2;
-    const wy = (dy / this.isoScale - dx) / 2;
-    return { x: wx, y: wy };
+    return { x: dx, y: dy };
   }
 
   /** Calculate world angle from screen coordinates */
@@ -242,6 +257,8 @@ class Game {
   }
 
   pointInShip(px, py) {
+    px = this.ship.x + Game.wrappedDelta(this.ship.x, px, this.worldWidth);
+    py = this.ship.y + Game.wrappedDelta(this.ship.y, py, this.worldHeight);
     const [A, B, C] = this.shipVertices();
     const v0x = C.x - A.x, v0y = C.y - A.y;
     const v1x = B.x - A.x, v1y = B.y - A.y;
@@ -258,6 +275,11 @@ class Game {
   }
 
   shipCircleCollision(obj) {
+    obj = {
+      ...obj,
+      x: this.ship.x + Game.wrappedDelta(this.ship.x, obj.x, this.worldWidth),
+      y: this.ship.y + Game.wrappedDelta(this.ship.y, obj.y, this.worldHeight)
+    };
     const verts = this.shipVertices();
     for (let i = 0; i < 3; i++) {
       const v1 = verts[i];
@@ -335,16 +357,49 @@ class Game {
   }
 
   spawnPlanets(num) {
-    for (let i = 0; i < num; i++) this.spawnPlanet();
+    const layouts = [
+      { x: 0.38, y: 0.48, radius: 150, color: '#3478f6' },
+      { x: 0.72, y: 0.30, radius: 105, color: '#f28c28' },
+      { x: 0.68, y: 0.75, radius: 75, color: '#9b7ede' }
+    ];
+    for (let i = 0; i < num; i++) {
+      const layout = layouts[i % layouts.length];
+      this.spawnPlanet(layout);
+    }
   }
 
-  spawnPlanet() {
-    const radius = Math.random() * 60 + 40;
+  spawnPlanet(layout = {}) {
+    const radius = layout.radius || Math.random() * 60 + 40;
     const mass = radius * Game.GRAVITY_MULT * Game.PLANET_GRAVITY_MULT;
-    const x = Math.random() * this.worldWidth;
-    const y = Math.random() * this.worldHeight;
-    const color = Game.PALETTE[Math.floor(Math.random() * Game.PALETTE.length)];
+    const x = layout.x ? layout.x * this.worldWidth : Math.random() * this.worldWidth;
+    const y = layout.y ? layout.y * this.worldHeight : Math.random() * this.worldHeight;
+    const color = layout.color || Game.PALETTE[Math.floor(Math.random() * Game.PALETTE.length)];
     this.planets.push({ x, y, radius, mass, color, shake: 0 });
+  }
+
+  /** Build a readable delivery route around the two main planets. */
+  createStations() {
+    const anchors = this.planets.length ? this.planets : [{ x: this.worldWidth / 2, y: this.worldHeight / 2, radius: 100 }];
+    const definitions = [
+      { planet: 0, angle: Math.PI, distance: 270 },
+      { planet: 0, angle: -0.35, distance: 330 },
+      { planet: Math.min(1, anchors.length - 1), angle: Math.PI * 0.7, distance: 240 },
+      { planet: Math.min(1, anchors.length - 1), angle: -0.4, distance: 260 }
+    ];
+    this.stations = definitions.map((definition, index) => {
+      const planet = anchors[definition.planet];
+      return {
+        x: Game.wrap(planet.x + Math.cos(definition.angle) * definition.distance, this.worldWidth),
+        y: Game.wrap(planet.y + Math.sin(definition.angle) * definition.distance, this.worldHeight),
+        radius: Game.STATION_RADIUS,
+        index
+      };
+    });
+    const start = this.stations[0];
+    this.ship.x = Game.wrap(start.x - 90, this.worldWidth);
+    this.ship.y = start.y;
+    this.ship.angle = 0;
+    this.currentStation = this.stations.length > 1 ? 1 : 0;
   }
 
   spawnEnemy() {
@@ -366,18 +421,26 @@ class Game {
   /** Spawn a single asteroid */
   spawnAsteroid() {
     if (this.asteroids.length >= Game.MAX_ASTEROIDS) return;
-    let x, y, tries = 0;
+    const planetIndex = Math.floor(Math.random() * this.planets.length);
+    const planet = this.planets[planetIndex];
+    const orbitRadius = planet.radius + 100 + Math.random() * 260;
+    let orbitAngle = Math.random() * Math.PI * 2;
+    let x = Game.wrap(planet.x + Math.cos(orbitAngle) * orbitRadius, this.worldWidth);
+    let y = Game.wrap(planet.y + Math.sin(orbitAngle) * orbitRadius, this.worldHeight);
+    let tries = 0;
     let safe = false;
     while (!safe && tries < 50) {
-      x = Math.random() * this.worldWidth;
-      y = Math.random() * this.worldHeight;
-      safe = this.asteroids.every(a => Math.hypot(x - a.x, y - a.y) > a.radius + 60);
+      safe = this.asteroids.every(a => Game.wrappedDistance({ x, y }, a, this.worldWidth, this.worldHeight) > a.radius + 60);
+      if (!safe) {
+        orbitAngle += 0.35;
+        x = Game.wrap(planet.x + Math.cos(orbitAngle) * orbitRadius, this.worldWidth);
+        y = Game.wrap(planet.y + Math.sin(orbitAngle) * orbitRadius, this.worldHeight);
+      }
       tries++;
     }
-    const angle = Math.random() * Math.PI * 2;
-    const speed = Math.random() * 0.5 + 0.2;
-    const dx = Math.cos(angle) * speed;
-    const dy = Math.sin(angle) * speed;
+    const angularSpeed = (0.08 + Math.random() * 0.08) * (Math.random() < 0.15 ? -1 : 1);
+    const dx = -Math.sin(orbitAngle) * angularSpeed * orbitRadius / 60;
+    const dy = Math.cos(orbitAngle) * angularSpeed * orbitRadius / 60;
     const radius = Math.random() * 40 + 30;
     const points = [];
     const count = Math.floor(Math.random() * 5) + 5;
@@ -386,10 +449,12 @@ class Game {
       const r = radius * (0.7 + Math.random() * 0.3);
       points.push({ x: Math.cos(a) * r, y: Math.sin(a) * r });
     }
-    const color = Game.PALETTE[Math.floor(Math.random() * Game.PALETTE.length)];
+    const asteroidColors = ['#9eabb8', '#c2ccd6', '#7f91a3'];
+    const color = asteroidColors[Math.floor(Math.random() * asteroidColors.length)];
     const hp = Math.max(1, Math.round(radius / 15));
     const mass = radius * Game.GRAVITY_MULT;
-    this.asteroids.push({ x, y, dx, dy, radius, points, color, hp, mass, spawnDelay: 1 });
+    this.asteroids.push({ x, y, dx, dy, radius, points, color, hp, mass, spawnDelay: 1,
+      orbit: { planetIndex, radius: orbitRadius, angle: orbitAngle, angularSpeed } });
   }
 
   /** Spawn shield/laser pickup */
@@ -520,11 +585,33 @@ class Game {
       angle
     });
     if (window.playSound) window.playSound('shoot', this.ship.x, this.ship.y);
-    if (!laser) {
-      this.ship.thrust.x -= Math.cos(angle) * 5 * Game.BULLET_MASS / this.ship.mass * 0.5;
-      this.ship.thrust.y -= Math.sin(angle) * 5 * Game.BULLET_MASS / this.ship.mass * 0.5;
-    }
     this.ship.canShoot = false;
+  }
+
+  checkDelivery(dt) {
+    this.deliveryCooldown = Math.max(0, this.deliveryCooldown - dt);
+    const station = this.stations[this.currentStation];
+    if (!station || this.deliveryCooldown > 0 || this.ship.dead) return;
+    const distance = Game.wrappedDistance(this.ship, station, this.worldWidth, this.worldHeight);
+    const speed = Math.hypot(this.ship.thrust.x, this.ship.thrust.y);
+    if (distance < station.radius + this.ship.radius + 18) {
+      if (speed <= Game.DOCKING_SPEED) {
+        this.deliveries += 1;
+        this.score = Math.min(99999, this.score + 250 + Math.round(this.timer));
+        this.currentStation = (this.currentStation + 1) % this.stations.length;
+        this.cargoIndex = (this.cargoIndex + 1) % this.cargoNames.length;
+        this.deliveryCooldown = 1.5;
+        this.timer = Math.min(Game.ROUND_TIME, this.timer + 20);
+        this.spawnParticles(station.x, station.y, 24, '#7dffb2', 1.4);
+        if (window.playTone) window.playTone(660, 0.18);
+        this.updateMission(`Delivered! Next: Station ${this.currentStation + 1}`);
+        this.updateTopbar();
+      } else {
+        this.updateMission(`Too fast to dock (${speed.toFixed(1)} / ${Game.DOCKING_SPEED}) — brake!`);
+      }
+    } else {
+      this.updateMission();
+    }
   }
 
   /** Spawn lines for asteroid explosion */
@@ -631,7 +718,7 @@ class Game {
     this.shipFragments = [];
     this.updateTopbar();
     let tries = 0;
-    while (this.asteroids.some(a => Math.hypot(this.ship.x - a.x, this.ship.y - a.y) < this.ship.radius + a.radius + 20) && tries < 50) {
+    while (this.asteroids.some(a => Game.wrappedDistance(this.ship, a, this.worldWidth, this.worldHeight) < this.ship.radius + a.radius + 20) && tries < 50) {
       this.ship.x = Math.random() * this.worldWidth;
       this.ship.y = Math.random() * this.worldHeight;
       tries++;
@@ -657,26 +744,25 @@ class Game {
 
   /** Draw parallax star background */
   drawBackground() {
-    const speed = Math.hypot(this.ship.thrust.x, this.ship.thrust.y);
     for (let i = 0; i < this.stars.length; i++) {
       const layer = this.stars[i];
       layer.forEach(s => {
-        const x = s.x - this.viewportX * s.factor;
-        const y = s.y - this.viewportY * s.factor;
-        const sx = ((x % this.worldWidth) + this.worldWidth) % this.worldWidth;
-        const sy = ((y % this.worldHeight) + this.worldHeight) % this.worldHeight;
-        const pos = this.isoTransform(sx, sy);
+        // Stars are an infinitely distant visual layer, not physical objects.
+        // Move them by only a fraction of camera displacement. This gives depth
+        // without suggesting a velocity different from nearby asteroids.
+        const sx = Game.wrap(s.x / this.worldWidth * this.canvas.width - this.ship.x * s.factor, this.canvas.width);
+        const sy = Game.wrap(s.y / this.worldHeight * this.canvas.height - this.ship.y * s.factor, this.canvas.height);
+        const pos = {
+          x: sx,
+          y: sy
+        };
         if (pos.x < 0 || pos.x > this.canvas.width || pos.y < 0 || pos.y > this.canvas.height) return;
-        const blur = speed * 10 * s.factor;
-        const bx = pos.x - this.ship.thrust.x * blur;
-        const by = pos.y - this.ship.thrust.y * blur;
-        this.ctx.strokeStyle = s.color;
-        this.ctx.beginPath();
-        this.ctx.moveTo(pos.x, pos.y);
-        this.ctx.lineTo(bx, by);
-        this.ctx.stroke();
+        this.ctx.fillStyle = s.color;
+        this.ctx.globalAlpha = 0.45 + s.factor * 0.55;
+        this.ctx.fillRect(pos.x, pos.y, s.size, s.size);
       });
     }
+    this.ctx.globalAlpha = 1;
 
     // draw board edges
     this.ctx.strokeStyle = '#fff';
@@ -695,6 +781,19 @@ class Game {
 
   drawPlanets() {
     this.planets.forEach(p => {
+      this.ctx.save();
+      this.ctx.strokeStyle = p.color;
+      this.ctx.globalAlpha = 0.12;
+      this.ctx.setLineDash([8, 14]);
+      this.drawWrapped(p.x, p.y, p.radius + 330, () => {
+        [p.radius + 170, p.radius + 310].forEach(orbitRadius => {
+          this.ctx.beginPath();
+          this.ctx.arc(p.x, p.y, orbitRadius, 0, Math.PI * 2);
+          this.ctx.stroke();
+        });
+      });
+      this.ctx.setLineDash([]);
+      this.ctx.restore();
       this.ctx.fillStyle = p.color;
       if (p.shake > 0 && Math.floor(p.shake * 20) % 2 === 0) this.ctx.fillStyle = '#fff';
       const offset = p.shake > 0 ? (Math.random() - 0.5) * 4 : 0;
@@ -704,6 +803,76 @@ class Game {
         this.ctx.fill();
       });
     });
+  }
+
+  drawStations() {
+    const ctx = this.ctx;
+    this.stations.forEach((station, index) => {
+      const active = index === this.currentStation;
+      const pulse = active ? 4 + Math.sin(Date.now() / 180) * 3 : 0;
+      ctx.save();
+      ctx.strokeStyle = active ? '#7dffb2' : '#6f8299';
+      ctx.fillStyle = active ? 'rgba(125,255,178,0.18)' : 'rgba(111,130,153,0.12)';
+      ctx.lineWidth = active ? 3 : 1;
+      this.drawWrapped(station.x, station.y, station.radius + pulse + 14, () => {
+        ctx.beginPath();
+        ctx.arc(station.x, station.y, station.radius + pulse, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(station.x - 16, station.y);
+        ctx.lineTo(station.x, station.y - 16);
+        ctx.lineTo(station.x + 16, station.y);
+        ctx.lineTo(station.x, station.y + 16);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.fillStyle = active ? '#7dffb2' : '#a8b4c2';
+        ctx.font = 'bold 13px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`S${index + 1}`, station.x, station.y + 35);
+      });
+      ctx.restore();
+    });
+  }
+
+  drawTrajectory() {
+    if (this.ship.dead) return;
+    const ctx = this.ctx;
+    let x = this.ship.x;
+    let y = this.ship.y;
+    let vx = this.ship.thrust.x;
+    let vy = this.ship.thrust.y;
+    ctx.save();
+    ctx.fillStyle = '#8fd3ff';
+    ctx.globalAlpha = 0.55;
+    for (let i = 0; i < 24; i++) {
+      let dominant = null;
+      this.planets.forEach(p => {
+        const dx = Game.wrappedDelta(x, p.x, this.worldWidth);
+        const dy = Game.wrappedDelta(y, p.y, this.worldHeight);
+        const distSq = dx * dx + dy * dy;
+        const range = Game.gravityRange(p.mass);
+        if (distSq > 1 && distSq < range * range) {
+          const influence = p.mass / (distSq + p.radius * p.radius);
+          if (!dominant || influence > dominant.influence) dominant = { p, dx, dy, distSq, range, influence };
+        }
+      });
+      if (dominant) {
+        const dist = Math.sqrt(dominant.distSq);
+        const raw = Game.GRAVITY * dominant.p.mass / (dominant.distSq + dominant.p.radius * dominant.p.radius);
+        const edge = Math.min(1, Math.max(0, (dominant.range - dist) / (dominant.range * 0.2)));
+        const accel = Math.min(Game.MAX_GRAVITY_ACCEL, raw * edge) * 5;
+        vx += dominant.dx / dist * accel;
+        vy += dominant.dy / dist * accel;
+      }
+      x = Game.wrap(x + vx * 5, this.worldWidth);
+      y = Game.wrap(y + vy * 5, this.worldHeight);
+      if (i % 2 === 0) {
+        const pos = this.isoTransform(x, y);
+        ctx.fillRect(pos.x - 1.5, pos.y - 1.5, 3, 3);
+      }
+    }
+    ctx.restore();
   }
 
   /** Draw mini map */
@@ -932,39 +1101,32 @@ class Game {
         this.ship.thrust.x *= ratio;
         this.ship.thrust.y *= ratio;
       }
+      // Only the strongest nearby planet affects the ship. This preserves
+      // slingshots without producing an unreadable sum of forces from every
+      // asteroid and planet on the map.
+      let dominant = null;
       this.planets.forEach(p => {
-        const dx = p.x - this.ship.x;
-        const dy = p.y - this.ship.y;
+        const dx = Game.wrappedDelta(this.ship.x, p.x, this.worldWidth);
+        const dy = Game.wrappedDelta(this.ship.y, p.y, this.worldHeight);
         const distSq = dx * dx + dy * dy;
         const range = Game.gravityRange(p.mass);
         if (distSq > 1 && distSq < range * range) {
-          const dist = Math.sqrt(distSq);
-          const a = Game.GRAVITY * p.mass / distSq;
-          const ax = (dx / dist) * a;
-          const ay = (dy / dist) * a;
-          this.ship.thrust.x += ax;
-          this.ship.thrust.y += ay;
-          gx += ax; gy += ay;
+          const influence = p.mass / (distSq + p.radius * p.radius);
+          if (!dominant || influence > dominant.influence) dominant = { p, dx, dy, distSq, influence, range };
         }
       });
-      this.asteroids.forEach(a => {
-        const dx = a.x - this.ship.x;
-        const dy = a.y - this.ship.y;
-        const distSq = dx * dx + dy * dy;
-        const range = Game.gravityRange(a.mass);
-        if (distSq > 1 && distSq < range * range) {
-          const dist = Math.sqrt(distSq);
-          const accelShip = Game.GRAVITY * a.mass / distSq;
-          const accelAst = Game.GRAVITY * this.ship.mass / distSq;
-          const ax = (dx / dist) * accelShip;
-          const ay = (dy / dist) * accelShip;
-          this.ship.thrust.x += ax;
-          this.ship.thrust.y += ay;
-          gx += ax; gy += ay;
-          a.dx -= (dx / dist) * accelAst;
-          a.dy -= (dy / dist) * accelAst;
-        }
-      });
+      if (dominant) {
+        const { p, dx, dy, distSq, range } = dominant;
+        const dist = Math.sqrt(distSq);
+        const raw = Game.GRAVITY * p.mass / (distSq + p.radius * p.radius);
+        const edge = Math.min(1, Math.max(0, (range - dist) / (range * 0.2)));
+        const accel = Math.min(Game.MAX_GRAVITY_ACCEL, raw * edge);
+        const ax = dx / dist * accel;
+        const ay = dy / dist * accel;
+        this.ship.thrust.x += ax;
+        this.ship.thrust.y += ay;
+        gx = ax; gy = ay;
+      }
       this.gravityAccel = Math.hypot(gx, gy);
       this.nearGravityTrap = this.gravityAccel > Game.SHIP_ACCEL * Game.GRAVITY_WARNING_RATIO;
       this.ship.x = (this.ship.x + this.ship.thrust.x + this.worldWidth) % this.worldWidth;
@@ -978,6 +1140,7 @@ class Game {
         this.fireBullet(this.ship.angle);
       }
       if (!this.keys[Game.KEY_SPACE]) this.ship.canShoot = true;
+      this.checkDelivery(dt);
     }
 
     this.spawnInvul = Math.max(0, this.spawnInvul - dt);
@@ -1025,6 +1188,20 @@ class Game {
     this.bullets = this.bullets.filter(b => b.life > 0);
 
     this.asteroids.forEach(a => {
+      if (a.orbit) {
+        const planet = this.planets[a.orbit.planetIndex];
+        if (planet) {
+          a.orbit.angle += a.orbit.angularSpeed * dt;
+          const nextX = Game.wrap(planet.x + Math.cos(a.orbit.angle) * a.orbit.radius, this.worldWidth);
+          const nextY = Game.wrap(planet.y + Math.sin(a.orbit.angle) * a.orbit.radius, this.worldHeight);
+          a.dx = Game.wrappedDelta(a.x, nextX, this.worldWidth);
+          a.dy = Game.wrappedDelta(a.y, nextY, this.worldHeight);
+          a.x = nextX;
+          a.y = nextY;
+          if (a.spawnDelay > 0) a.spawnDelay = Math.max(0, a.spawnDelay - dt);
+          return;
+        }
+      }
       this.planets.forEach(p => {
         const dx = p.x - a.x;
         const dy = p.y - a.y;
@@ -1044,7 +1221,7 @@ class Game {
 
     this.bullets.forEach((b, bi) => {
       this.asteroids.forEach((a, ai) => {
-        if (Math.hypot(b.x - a.x, b.y - a.y) < a.radius) {
+        if (Game.wrappedDistance(b, a, this.worldWidth, this.worldHeight) < a.radius) {
           this.bullets.splice(bi, 1);
           this.addScore(a.hp);
           this.spawnParticles(b.x, b.y, 5, a.color);
@@ -1060,7 +1237,7 @@ class Game {
         }
       });
       this.enemies.forEach((e, ei) => {
-        if (Math.hypot(b.x - e.x, b.y - e.y) < Game.ENEMY_RADIUS) {
+        if (Game.wrappedDistance(b, e, this.worldWidth, this.worldHeight) < Game.ENEMY_RADIUS) {
           this.bullets.splice(bi, 1);
           e.hp -= 1;
           this.spawnParticles(e.x, e.y, 20, '#f0f');
@@ -1100,7 +1277,7 @@ class Game {
       for (let j = i + 1; j < this.asteroids.length; j++) {
         const b = this.asteroids[j];
         if (a.spawnDelay > 0 || b.spawnDelay > 0) continue;
-        if (Math.hypot(a.x - b.x, a.y - b.y) < a.radius + b.radius) {
+        if (Game.wrappedDistance(a, b, this.worldWidth, this.worldHeight) < a.radius + b.radius) {
           const ang = Math.atan2(b.y - a.y, b.x - a.x);
           const force = 0.5;
           a.dx -= Math.cos(ang) * force * b.mass / a.mass;
@@ -1174,7 +1351,7 @@ class Game {
         }
       }
       this.asteroids.forEach((a, ai) => {
-        if (Math.hypot(a.x - pl.x, a.y - pl.y) < a.radius + pl.radius) {
+        if (Game.wrappedDistance(a, pl, this.worldWidth, this.worldHeight) < a.radius + pl.radius) {
           pl.shake = Math.max(pl.shake, Math.min(1, a.mass / pl.mass));
           this.spawnParticles(a.x, a.y, 20, a.color);
           this.asteroids.splice(ai, 1);
@@ -1183,14 +1360,14 @@ class Game {
         }
       });
       this.bullets.forEach((b, bi) => {
-        if (Math.hypot(b.x - pl.x, b.y - pl.y) < pl.radius) {
+        if (Game.wrappedDistance(b, pl, this.worldWidth, this.worldHeight) < pl.radius) {
           pl.shake = Math.max(pl.shake, Math.min(1, Game.BULLET_MASS / pl.mass));
           this.spawnParticles(b.x, b.y, 5, '#fff');
           this.bullets.splice(bi, 1);
         }
       });
       this.pickups.forEach((p, pi) => {
-        if (Math.hypot(p.x - pl.x, p.y - pl.y) < pl.radius + p.size) {
+        if (Game.wrappedDistance(p, pl, this.worldWidth, this.worldHeight) < pl.radius + p.size) {
           pl.shake = Math.max(pl.shake, Math.min(1, 1 / pl.mass));
           this.spawnParticles(p.x, p.y, 10, p.color);
           this.pickups.splice(pi, 1);
@@ -1208,19 +1385,19 @@ class Game {
     this.pickupTimer -= dt;
     if (this.pickupTimer <= 0) {
       this.spawnPickup();
-      this.pickupTimer = 3 + Math.random() * 5;
+      this.pickupTimer = 18 + Math.random() * 8;
     }
 
     this.healPickupTimer -= dt;
     if (this.healPickupTimer <= 0) {
       this.spawnHealPickup();
-      this.healPickupTimer = 20 + Math.random() * 10;
+      this.healPickupTimer = 35 + Math.random() * 15;
     }
 
     this.timePickupTimer -= dt;
     if (this.timePickupTimer <= 0) {
       this.spawnTimePickup();
-      this.timePickupTimer = 30 + Math.random() * 15;
+      this.timePickupTimer = 45 + Math.random() * 20;
     }
 
     this.pickups.forEach((p, pi) => {
@@ -1246,7 +1423,7 @@ class Game {
         return;
       }
       this.asteroids.forEach((a, ai) => {
-        if (Math.hypot(p.x - a.x, p.y - a.y) < p.size + a.radius) {
+        if (Game.wrappedDistance(p, a, this.worldWidth, this.worldHeight) < p.size + a.radius) {
           this.spawnParticles((p.x + a.x) / 2, (p.y + a.y) / 2, 5, p.color);
           p.hp -= 1;
           a.hp -= 0.5;
@@ -1258,7 +1435,7 @@ class Game {
         }
       });
       this.bullets.forEach((b, bi) => {
-        if (Math.hypot(b.x - p.x, b.y - p.y) < p.size) {
+        if (Game.wrappedDistance(b, p, this.worldWidth, this.worldHeight) < p.size) {
           this.bullets.splice(bi, 1);
           this.spawnParticles(p.x, p.y, 50, p.color, 2);
           this.pickups.splice(pi, 1);
@@ -1307,7 +1484,7 @@ class Game {
 
     for (let ei = 0; ei < this.enemies.length; ei++) {
       const e = this.enemies[ei];
-      const distToShip = Math.hypot(e.x - this.ship.x, e.y - this.ship.y);
+      const distToShip = Game.wrappedDistance(e, this.ship, this.worldWidth, this.worldHeight);
       if (distToShip < e.detection && !this.ship.dead) {
         if (!e.alerted) { e.alerted = true; if (window.playSound) window.playSound('alarm'); }
         e.alertBlink += dt;
@@ -1400,6 +1577,8 @@ class Game {
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     this.drawBackground();
     this.drawPlanets();
+    this.drawStations();
+    this.drawTrajectory();
 
     this.asteroidLines.forEach(l => {
       ctx.save();
@@ -1585,9 +1764,20 @@ class Game {
 
   /** Main loop called by requestAnimationFrame */
   loop(timestamp) {
-    const dt = (timestamp - this.lastTime) / 1000;
+    // A fixed simulation step makes thrust, gravity and collisions identical on
+    // 60 Hz, 144 Hz and throttled displays. Cap long pauses to avoid a spiral of
+    // death after switching tabs.
+    const frameTime = Math.min((timestamp - this.lastTime) / 1000, Game.MAX_FRAME_TIME);
     this.lastTime = timestamp;
-    if (!this.paused) this.update(dt);
+    if (!this.paused) {
+      this.accumulator += frameTime;
+      while (this.accumulator >= Game.FIXED_DT) {
+        this.update(Game.FIXED_DT);
+        this.accumulator -= Game.FIXED_DT;
+      }
+    } else {
+      this.accumulator = 0;
+    }
     this.draw();
     if (window.updateJoystickIndicator) window.updateJoystickIndicator();
     if (this.running) requestAnimationFrame(t => this.loop(t));
@@ -1598,6 +1788,16 @@ class Game {
     this.onEnd = onEnd;
     this.running = true;
     requestAnimationFrame(t => { this.lastTime = t; this.loop(t); });
+  }
+
+  /** Stop animation, networking timers and listeners owned by this instance. */
+  destroy() {
+    this.running = false;
+    clearInterval(this.pingInterval);
+    window.removeEventListener('keydown', this.onKeyDown);
+    window.removeEventListener('keyup', this.onKeyUp);
+    window.removeEventListener('resize', this.onResize);
+    if (this.dataChannel) this.dataChannel.onmessage = null;
   }
 
   setDataChannel(ch) {
@@ -1683,6 +1883,26 @@ Game.segCircleIntersect = function(x1, y1, x2, y2, cx, cy, r) {
   return (t1 >= 0 && t1 <= 1) || (t2 >= 0 && t2 <= 1);
 };
 
+/** Wrap a coordinate into [0, size), including negative inputs. */
+Game.wrap = function(value, size) {
+  return ((value % size) + size) % size;
+};
+
+/** Shortest signed displacement from `from` to `to` on a toroidal axis. */
+Game.wrappedDelta = function(from, to, size) {
+  let delta = to - from;
+  if (delta > size / 2) delta -= size;
+  if (delta < -size / 2) delta += size;
+  return delta;
+};
+
+Game.wrappedDistance = function(a, b, width, height = width) {
+  return Math.hypot(
+    Game.wrappedDelta(a.x, b.x, width),
+    Game.wrappedDelta(a.y, b.y, height)
+  );
+};
+
 // Game constants
 Game.KEY_LEFT = 37;
 Game.KEY_UP = 38;
@@ -1707,9 +1927,9 @@ Game.EXHAUST_OFFSET = 1; // relative to ship radius
 Game.ROUND_TIME = 150;
 Game.MIN_ASTEROID_RADIUS = 15;
 Game.WORLD_SIZE = 3000;
-Game.MIN_INITIAL_ASTEROIDS = 10;
-Game.MAX_INITIAL_ASTEROIDS = 100;
-Game.MAX_ASTEROIDS = 100;
+Game.MIN_INITIAL_ASTEROIDS = 12;
+Game.MAX_INITIAL_ASTEROIDS = 24;
+Game.MAX_ASTEROIDS = 32;
 Game.MAX_SPEED = 2;
 Game.BULLET_MASS = 0.5;
 Game.GRAVITY = 5;
@@ -1723,9 +1943,9 @@ Game.DEFAULT_ROTATE_DURATION = 0.15;
 Game.FAST_ROTATE_DURATION = 0.05;
 // warn about strong gravity sooner
 Game.GRAVITY_WARNING_RATIO = 0.4;
-Game.MAX_PLANETS = 3;
-Game.MIN_ENEMIES = 3;
-Game.MAX_ENEMIES = 10;
+Game.MAX_PLANETS = 2;
+Game.MIN_ENEMIES = 0;
+Game.MAX_ENEMIES = 0;
 Game.ENEMY_RADIUS = 20;
 Game.ENEMY_FONT_SIZE = 48;
 Game.ENEMY_MAX_SPEED = 2;
@@ -1734,5 +1954,11 @@ Game.ENEMY_DETECTION_RADIUS = 600;
 Game.ENEMY_HP = 1;
 Game.PALETTE = ['#fff', '#0ff', '#f0f', '#ff0', '#0f0', '#f00', '#00f', '#f80'];
 Game.ISO_SCALE = 0.5;
+Game.FIXED_DT = 1 / 60;
+Game.MAX_FRAME_TIME = 0.25;
+Game.STATION_RADIUS = 34;
+Game.DOCKING_SPEED = 1.15;
+Game.MAX_GRAVITY_ACCEL = 0.012;
 
-window.Game = Game;
+if (typeof window !== 'undefined') window.Game = Game;
+if (typeof module !== 'undefined' && module.exports) module.exports = Game;
