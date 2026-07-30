@@ -1,12 +1,231 @@
-<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Orbitalna Przesyłka 0.6</title><link rel="stylesheet" href="styles.css"></head><body>
-<canvas id="game"></canvas>
-<header id="hud" class="hidden"><div><small>NASTĘPNY CEL</small><b id="objective">—</b><span id="distance">—</span></div><div><label>KADŁUB <span id="hullText">100%</span><meter id="hull" min="0" max="100" value="100"></meter></label><label>ŁADUNEK <span id="cargoText">100%</span><meter id="cargo" min="0" max="100" value="100"></meter></label></div><div><b id="timer">00:00</b><span id="style">STYL ×1.0</span><button id="assist">ASSIST: ON</button></div></header>
-<aside id="radio" class="hidden"><small>KONTROLA LOTU</small><p id="radioText">Trasa gotowa.</p></aside><canvas id="minimap" width="180" height="180" class="hidden"></canvas><div id="prompt" class="hidden"></div>
-<section id="menu" class="screen"><div class="brand"><small>WERSJA 0.6 · PROGRAM KURIERSKI</small><h1>ORBITALNA<br><em>PRZESYŁKA</em></h1><p>Łap grawitację. Tnij zakręty. Dowieź coś, czego zdecydowanie nie powinno być w kosmosie.</p></div><div class="actions"><button id="play" class="primary">MAPA MISJI →</button><button id="how">STEROWANIE</button><button id="mute">DŹWIĘK: ON</button><p id="best">Brak ukończonych tras</p></div></section>
-<section id="contracts" class="screen hidden"><div class="panel wide"><small>MAPA SEKTORA · 6 TRAS</small><h2>Wybierz misję</h2><p class="subtitle">Każda karta to kompletna trasa i konkretny ładunek. Zacznij od Licencji albo wybierz dowolne wyzwanie.</p><div id="contractCards" class="cards"></div><button class="back">← WRÓĆ</button></div></section>
-<section id="briefing" class="screen hidden"><div class="panel"><small id="briefingLabel">LICENCJA KURIERSKA</small><h2 id="briefingTitle">Plan lotu</h2><p id="briefingDesc"></p><div id="briefingMeta" class="mission-meta"></div><ol><li><b>W/S</b> lub przyciski — ciąg i hamowanie</li><li><b>A/D</b> — obrót, <b>Q/E</b> — strafe</li><li>Dokuj w zielonej strefie poniżej limitu prędkości.</li></ol><p class="tip">Kropki przewidują 2,5 sekundy lotu. Czerwone oznaczają zderzenie.</p><button id="launch" class="primary">START MISJI →</button><button id="briefingBack">← INNA MISJA</button></div></section>
-<section id="pause" class="screen hidden"><div class="panel"><h2>Pauza</h2><button id="resume" class="primary">WRACAM DO LOTU</button><button id="restart">RESTART</button><button class="home">MENU</button></div></section>
-<section id="summary" class="screen hidden"><div class="panel wide"><small id="summaryLabel">KONTRAKT UKOŃCZONY</small><h2 id="summaryTitle"></h2><div id="summaryStats" class="stats"></div><p id="summaryQuip" class="tip"></p><button id="again" class="primary">JESZCZE RAZ</button><button class="home">MENU</button></div></section>
-<section id="help" class="screen hidden"><div class="panel"><h2>Sterowanie</h2><p><b>Klawiatura:</b> W/↑ ciąg · S/↓ hamowanie · A/D obrót · Q/E strafe · F asysta · H klakson · Esc pauza</p><p><b>Telefon/tablet:</b> przytrzymaj przyciski u dołu. Lewy zestaw obraca i przesuwa, prawy uruchamia silnik i hamulec.</p><button class="back">← WRÓĆ</button></div></section>
-<nav id="touchControls" class="touch-controls hidden" aria-label="Sterowanie dotykowe"><div class="touch-cluster"><button data-key="KeyQ">↖<small>STRAFE</small></button><button data-key="KeyA">↶<small>OBRÓT</small></button><button data-key="KeyD">↷<small>OBRÓT</small></button><button data-key="KeyE">↗<small>STRAFE</small></button></div><div class="touch-cluster thrust"><button data-key="KeyS">▼<small>HAMUJ</small></button><button data-key="KeyW">▲<small>CIĄG</small></button></div></nav>
-<script src="game.js"></script><script src="main.js"></script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple Asteroids Game</title>
+  <!-- tiny transparent favicon to avoid 404 errors -->
+  <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/5/hPQAH/wM7fGNCAA==">
+  <link rel="stylesheet" href="easter-egg/styles.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Doto:wght@100..900&display=swap');
+    body { margin: 0; background: #222; color: #fff; font-family: 'Doto', sans-serif; text-align: center; overflow: hidden; }
+    #wrapper { position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; transition: transform 0.3s ease; }
+    #game { background: #000; display: block; width: 100%; height: 100%; }
+    #sidebar { display: flex; flex-direction: row; align-items: flex-start; position: absolute; top: 0; left: 0; right: 0; background: rgba(0,0,0,0.5); padding: 8px 10px; border-radius: 0 0 8px 8px; }
+    #topbar { display: flex; flex-direction: column; text-align: left; padding: 0 10px 0 0; box-sizing: border-box; }
+    #topbar span { margin: 2px 0; display: inline-block; }
+    #minimap { background: #000; display: inline-block; margin-left: auto; }
+    h1 { margin-bottom: 5px; font-size: 48px; }
+    #menuTitle { position: relative; z-index: 1; }
+    button { font-family: 'Doto', sans-serif; font-size: 48px; margin: 10px; padding: 10px 20px; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .network-notice { max-width: 640px; margin: 4px 20px; color: #bbb; font: 700 16px/1.4 sans-serif; }
+    #shareOverlay textarea { width: 80%; height: 80px; overflow: auto; }
+    #shareOverlay button { font-size: 24px; margin: 5px; }
+    #shareOverlay { z-index: 250; }
+    .key { display:inline-block; border:1px solid #fff; border-radius:4px; padding:2px 6px; margin:0 2px; font-size:32px; }
+    #footer { margin-top: 10px; font-size: 14px; color: #888; font-weight: bold;
+              position: fixed; bottom: 0; left: 0; width: 100%; z-index: 101; }
+    .screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #000; z-index: 100; }
+    #menu { background: rgba(0,0,0,0.8); overflow: hidden; }
+    #menuStars { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+    #menu button { position: relative; z-index: 1; }
+    .hidden { display: none; }
+    .screen.hidden { display: none; }
+    #mobileControls.hidden { display: none; }
+    #swipeHandle {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      width: 20px;
+      right: 0;
+      background: rgba(255,255,255,0.2);
+      z-index: 150;
+      display: none;
+      pointer-events: none;
+    }
+    #swipeHandle.active { display: block; }
+    #mobileControls { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; pointer-events: auto; }
+    #joystick {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.05);
+      left: 50%;
+      top: 50%;
+      margin-left: -40px;
+      margin-top: -40px;
+      pointer-events: none;
+      transition: opacity 0.1s;
+    }
+    #joystick.active { background: rgba(255,255,255,0.2); }
+    #stick {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 40px;
+      height: 40px;
+      margin-left: -20px;
+      margin-top: -20px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      pointer-events: none;
+    }
+    body.mobile #topbar,
+    body.mobile #minimap {
+      transform: scale(0.75);
+      transform-origin: bottom right;
+    }
+    #labyrinthCanvas {
+      width: min(420px, 90vw);
+      height: min(680px, 80vh);
+      max-width: 90vw;
+      max-height: 80vh;
+      background: rgba(0,0,0,0.2);
+      border-radius: 24px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.45);
+    }
+    .labyrinth-status {
+      max-width: 520px;
+      padding: 0 24px;
+      line-height: 1.5;
+      font-size: 20px;
+    }
+    body:not(.game-active) #wrapper {
+      visibility: hidden;
+      pointer-events: none;
+    }
+    body.game-active #wrapper {
+      visibility: visible;
+      pointer-events: auto;
+    }
+  </style>
+</head>
+<body>
+  <div id="wrapper">
+    <canvas id="game"></canvas>
+    <div id="sidebar">
+      <div id="topbar">
+        <span id="score">Score: 00000</span>
+        <span id="timer">Timer: [02:30]</span>
+        <span id="lives">Lives: |||||</span>
+        <span id="armor">Armor: |||||</span>
+        <span id="enemies">Enemies: 0</span>
+        <span id="ping">Ping: 0ms</span>
+      </div>
+      <canvas id="minimap" width="150" height="150"></canvas>
+    </div>
+  <div id="mobileControls" class="hidden">
+    <div id="joystick"><div id="stick"></div></div>
+  </div>
+  </div>
+  <div id="swipeHandle" class="hidden"></div>
+
+  <div id="shareOverlay" class="screen hidden">
+    <h2>Share Code</h2>
+    <textarea id="shareLink" readonly style="width:80%;height:80px;overflow:auto;"></textarea>
+    <div>
+      <button id="shortenBtn">Shorten</button>
+      <button id="copyLinkBtn">Copy</button>
+      <button id="waBtn">WhatsApp</button>
+      <button id="msgrBtn">Messenger</button>
+      <button id="smsBtn">SMS</button>
+      <button id="shareClose">Close</button>
+    </div>
+  </div>
+
+  <div id="menu" class="screen">
+    <canvas id="menuStars"></canvas>
+    <h1 id="menuTitle">Asteroids</h1>
+    <button id="resumeBtn" class="hidden">R&#xC9;SUM&#xC9;</button>
+    <button id="newGameBtn">New Game</button>
+    <button id="settingsBtn">Settings</button>
+    <button id="controlsBtn">Controls</button>
+    <button id="aboutBtn">About</button>
+    <button id="creditsBtn">Credits</button>
+  </div>
+  <div id="modeScreen" class="screen hidden">
+    <h2>Select Mode</h2>
+    <button id="singleBtn">Single Player</button>
+    <button id="hostBtn" disabled title="Signaling service is unavailable">Multiplayer Create (experimental)</button>
+    <button id="joinBtn" disabled title="Signaling service is unavailable">Multiplayer Join (experimental)</button>
+    <p class="network-notice">Online mode is temporarily unavailable while signaling is migrated from Google Sheets.</p>
+  </div>
+  <div id="settingsScreen" class="screen hidden">
+    <h2>Settings</h2>
+    <div id="settingsText" style="width:800px;height:600px;"></div>
+    <button id="resetBtn">Reset defaults</button>
+    <button id="backBtn">Back</button>
+  </div>
+  <div id="controlsScreen" class="screen hidden">
+    <h2>Controls</h2>
+    <div id="controlsInfo">
+      <p><span class="key">W</span>/<span class="key">Up</span> thrust forward</p>
+      <p><span class="key">S</span>/<span class="key">Down</span> reverse thrust</p>
+      <p><span class="key">A</span>/<span class="key">Left</span> rotate left</p>
+      <p><span class="key">D</span>/<span class="key">Right</span> rotate right</p>
+      <p><span class="key">Q</span> left strafe&nbsp;&nbsp;<span class="key">E</span> right strafe</p>
+      <p><span class="key">Space</span> shoot &nbsp;&nbsp;<span class="key">Enter</span> align velocity</p>
+      <p><span class="key">Esc</span> pause</p>
+    </div>
+    <button id="controlsBack">Back</button>
+  </div>
+  <div id="aboutScreen" class="screen hidden">
+    <h2>About</h2>
+    <div id="aboutInfo" style="width:600px;height:400px;overflow-y:auto;text-align:left">
+      <p><strong>Enemies</strong> - violet UFOs chasing the player.</p>
+      <p><strong>Pickups</strong></p>
+      <ul>
+        <li><span class="key">S</span> - temporary shield</li>
+        <li><span class="key">H</span> - full heal</li>
+        <li><span class="key">T</span> - extra time</li>
+        <li><span class="key">L</span> - laser ammo</li>
+      </ul>
+      <p><strong>Objects</strong> - asteroids, planets and stars affect movement with gravity.</p>
+      <p><strong>Weapons</strong> - basic bullets or blue lasers when pickup L is active.</p>
+    </div>
+    <button id="aboutBack">Back</button>
+  </div>
+  <div id="creditsScreen" class="screen hidden">
+    <h2>Credits</h2>
+    <p>Created with help of OpenAI Codex</p>
+    <button id="labyrinthBtn">Easter Egg</button>
+    <button id="portalTrigger" class="portal-trigger" aria-label="Activate secret portal"><span class="visually-hidden">Activate secret portal</span></button>
+    <button id="creditsBack">Back</button>
+  </div>
+
+  <div id="portalScreen" class="screen hidden">
+    <h2>Kieszeń Rzeczywistości</h2>
+    <canvas id="portalCanvas" width="420" height="680"></canvas>
+    <div id="portalInfo">
+      <p id="portalStatus">Przechyl telefon i nadaj dostęp do czujników ruchu, aby otworzyć okno do miniaturowej rzeczywistości.</p>
+      <p>Trzymaj urządzenie jak wizjer. Ruchy telefonu przesuwają kamerę w przestrzeni o rozpiętości jednego ramienia, a jego nachylenie wskazuje kierunek patrzenia.</p>
+    </div>
+    <button id="portalBack">Powrót do kredytów</button>
+  </div>
+
+  <div id="labyrinthScreen" class="screen hidden">
+    <h2>Labirynt Kulki</h2>
+    <canvas id="labyrinthCanvas" width="420" height="680"></canvas>
+    <p id="labyrinthStatus" class="labyrinth-status">Przechyl urządzenie, by wprawić kulkę w ruch.</p>
+    <button id="labyrinthCalibrate">Kalibruj orientację</button>
+    <button id="labyrinthBack">Powrót do kredytów</button>
+  </div>
+
+  <div id="footer"><strong id="footerVersion">Version</strong></div>
+
+  <script src="https://fraigo.github.io/javascript-midi-player/midiplayer/WebAudioFontPlayer.js"></script>
+  <script src="https://fraigo.github.io/javascript-midi-player/midiplayer/MIDIFile.js"></script>
+  <script src="https://fraigo.github.io/javascript-midi-player/midiplayer/MIDIPlayer.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.152.2/three.min.js" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.0/ace.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.0/mode-json5.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+  <script src="game.js"></script>
+  <script src="knock.js"></script>
+  <script src="labyrinth.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
