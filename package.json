@@ -1,0 +1,13 @@
+{
+  "name": "orbitalna-przesylka",
+  "version": "0.5.0",
+  "private": true,
+  "scripts": {
+    "test": "node --test",
+    "check": "node scripts/check-syntax.mjs",
+    "serve": "node scripts/serve.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.54.1"
+  }
+}

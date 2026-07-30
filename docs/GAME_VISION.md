@@ -463,6 +463,10 @@ Przed końcem każdej sesji odpowiedzieć `tak/nie` z dowodem:
 - czy mobile oferuje te same decyzje, a nie tylko okrojoną wersję sterowania;
 - czy nowa zawartość wzmacnia cel dostawy — jeśli nie, usunąć ją mimo kosztu implementacji.
 
+## Stan realizacji — 2026-07-30
+
+**Etap 1 zaimplementowany technicznie; brama produktowa warunkowa.** Powstała deterministyczna misja `license-01`, rozdzielone moduły symulacji/misji/inputu/renderera/audio/storage/UI, pełny flow aplikacji, zapis kompatybilnego ghosta, zachowany tryb klasyczny i Easter Eggi oraz zestaw testów i generator 12 screenshotów desktop/mobile (binarne wyniki pozostają lokalnym artefaktem, poza Git). Szczegółowe komendy, wyniki i ograniczenie braku dziesięciu zewnętrznych playtestów opisuje `docs/playtests/stage-1-report.md`. Nie uznajemy metryk ludzkich za spełnione bez testerów; Etap 2 powinien zacząć się od ich weryfikacji i strojenia, nie od obchodzenia bramy.
+
 ## Prompty startowe dla kolejnych sesji
 
 Każdy prompt zakłada pracę na bieżącej gałęzi po poprzedniej sesji. Wklej dokładnie prompt właściwego etapu; Codex ma sam przeczytać pełny plan, sprawdzić stan repozytorium i nie ufać bez weryfikacji deklaracjom poprzednika.
