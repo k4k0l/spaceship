@@ -69,6 +69,7 @@ class Game {
     this.timer = Game.ROUND_TIME;
     this.exhaustDelay = 0;
     this.lastTime = 0;
+    this.accumulator = 0;
 
     this.viewportX = 0;
     this.viewportY = 0;
@@ -82,8 +83,8 @@ class Game {
       radius: Game.DEFAULT_SHIP_RADIUS,
       mass: Game.DEFAULT_SHIP_MASS,
       thrust: {
-        x: Math.cos(startAngle) * 0.5,
-        y: Math.sin(startAngle) * 0.5
+        x: 0,
+        y: 0
       },
       canShoot: true,
       dead: false,
@@ -96,15 +97,21 @@ class Game {
     this.rotateTarget = 0;
 
     const getKey = Game.keyFromEvent;
-    window.addEventListener('keydown', e => {
+    this.onKeyDown = e => {
       const code = getKey(e);
-      if (code != null) this.keys[code] = true;
-    });
-    window.addEventListener('keyup', e => {
+      if (code != null) {
+        this.keys[code] = true;
+        if ([Game.KEY_LEFT, Game.KEY_RIGHT, Game.KEY_UP, Game.KEY_DOWN, Game.KEY_SPACE].includes(code)) e.preventDefault();
+      }
+    };
+    this.onKeyUp = e => {
       const code = getKey(e);
       if (code != null) this.keys[code] = false;
-    });
-    window.addEventListener('resize', () => this.resizeCanvas());
+    };
+    this.onResize = () => this.resizeCanvas();
+    window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('keyup', this.onKeyUp);
+    window.addEventListener('resize', this.onResize);
     this.resizeCanvas();
     this.createStars();
     this.updateTimer();
@@ -185,14 +192,13 @@ class Game {
 
   /** Convert world coordinates to isometric screen coordinates */
   isoTransform(x, y) {
-    let dx = x - this.ship.x;
-    let dy = y - this.ship.y;
-    if (dx > this.worldWidth / 2) dx -= this.worldWidth;
-    if (dx < -this.worldWidth / 2) dx += this.worldWidth;
-    if (dy > this.worldHeight / 2) dy -= this.worldHeight;
-    if (dy < -this.worldHeight / 2) dy += this.worldHeight;
-    const ix = dx - dy;
-    const iy = (dx + dy) * this.isoScale;
+    const dx = Game.wrappedDelta(this.ship.x, x, this.worldWidth);
+    const dy = Game.wrappedDelta(this.ship.y, y, this.worldHeight);
+    // The game is rendered as a true top-down field. Keeping this transform as
+    // the single camera boundary prevents visual perspective from leaking into
+    // simulation coordinates.
+    const ix = dx;
+    const iy = dy;
     return {
       x: ix + this.canvas.width / 2,
       y: iy + this.canvas.height / 2
@@ -201,18 +207,12 @@ class Game {
 
   /** Convert a world angle to an isometric screen angle */
   isoAngle(angle) {
-    const dx = Math.cos(angle);
-    const dy = Math.sin(angle);
-    const ix = dx - dy;
-    const iy = (dx + dy) * this.isoScale;
-    return Math.atan2(iy, ix);
+    return angle;
   }
 
   /** Convert a screen delta in pixels to world delta */
   screenDeltaToWorld(dx, dy) {
-    const wx = (dx + dy / this.isoScale) / 2;
-    const wy = (dy / this.isoScale - dx) / 2;
-    return { x: wx, y: wy };
+    return { x: dx, y: dy };
   }
 
   /** Calculate world angle from screen coordinates */
@@ -242,6 +242,8 @@ class Game {
   }
 
   pointInShip(px, py) {
+    px = this.ship.x + Game.wrappedDelta(this.ship.x, px, this.worldWidth);
+    py = this.ship.y + Game.wrappedDelta(this.ship.y, py, this.worldHeight);
     const [A, B, C] = this.shipVertices();
     const v0x = C.x - A.x, v0y = C.y - A.y;
     const v1x = B.x - A.x, v1y = B.y - A.y;
@@ -258,6 +260,11 @@ class Game {
   }
 
   shipCircleCollision(obj) {
+    obj = {
+      ...obj,
+      x: this.ship.x + Game.wrappedDelta(this.ship.x, obj.x, this.worldWidth),
+      y: this.ship.y + Game.wrappedDelta(this.ship.y, obj.y, this.worldHeight)
+    };
     const verts = this.shipVertices();
     for (let i = 0; i < 3; i++) {
       const v1 = verts[i];
@@ -371,7 +378,7 @@ class Game {
     while (!safe && tries < 50) {
       x = Math.random() * this.worldWidth;
       y = Math.random() * this.worldHeight;
-      safe = this.asteroids.every(a => Math.hypot(x - a.x, y - a.y) > a.radius + 60);
+      safe = this.asteroids.every(a => Game.wrappedDistance({ x, y }, a, this.worldWidth, this.worldHeight) > a.radius + 60);
       tries++;
     }
     const angle = Math.random() * Math.PI * 2;
@@ -631,7 +638,7 @@ class Game {
     this.shipFragments = [];
     this.updateTopbar();
     let tries = 0;
-    while (this.asteroids.some(a => Math.hypot(this.ship.x - a.x, this.ship.y - a.y) < this.ship.radius + a.radius + 20) && tries < 50) {
+    while (this.asteroids.some(a => Game.wrappedDistance(this.ship, a, this.worldWidth, this.worldHeight) < this.ship.radius + a.radius + 20) && tries < 50) {
       this.ship.x = Math.random() * this.worldWidth;
       this.ship.y = Math.random() * this.worldHeight;
       tries++;
@@ -657,26 +664,25 @@ class Game {
 
   /** Draw parallax star background */
   drawBackground() {
-    const speed = Math.hypot(this.ship.thrust.x, this.ship.thrust.y);
     for (let i = 0; i < this.stars.length; i++) {
       const layer = this.stars[i];
       layer.forEach(s => {
-        const x = s.x - this.viewportX * s.factor;
-        const y = s.y - this.viewportY * s.factor;
-        const sx = ((x % this.worldWidth) + this.worldWidth) % this.worldWidth;
-        const sy = ((y % this.worldHeight) + this.worldHeight) % this.worldHeight;
-        const pos = this.isoTransform(sx, sy);
+        // Stars are an infinitely distant visual layer, not physical objects.
+        // Move them by only a fraction of camera displacement. This gives depth
+        // without suggesting a velocity different from nearby asteroids.
+        const sx = Game.wrap(s.x / this.worldWidth * this.canvas.width - this.ship.x * s.factor, this.canvas.width);
+        const sy = Game.wrap(s.y / this.worldHeight * this.canvas.height - this.ship.y * s.factor, this.canvas.height);
+        const pos = {
+          x: sx,
+          y: sy
+        };
         if (pos.x < 0 || pos.x > this.canvas.width || pos.y < 0 || pos.y > this.canvas.height) return;
-        const blur = speed * 10 * s.factor;
-        const bx = pos.x - this.ship.thrust.x * blur;
-        const by = pos.y - this.ship.thrust.y * blur;
-        this.ctx.strokeStyle = s.color;
-        this.ctx.beginPath();
-        this.ctx.moveTo(pos.x, pos.y);
-        this.ctx.lineTo(bx, by);
-        this.ctx.stroke();
+        this.ctx.fillStyle = s.color;
+        this.ctx.globalAlpha = 0.45 + s.factor * 0.55;
+        this.ctx.fillRect(pos.x, pos.y, s.size, s.size);
       });
     }
+    this.ctx.globalAlpha = 1;
 
     // draw board edges
     this.ctx.strokeStyle = '#fff';
@@ -1044,7 +1050,7 @@ class Game {
 
     this.bullets.forEach((b, bi) => {
       this.asteroids.forEach((a, ai) => {
-        if (Math.hypot(b.x - a.x, b.y - a.y) < a.radius) {
+        if (Game.wrappedDistance(b, a, this.worldWidth, this.worldHeight) < a.radius) {
           this.bullets.splice(bi, 1);
           this.addScore(a.hp);
           this.spawnParticles(b.x, b.y, 5, a.color);
@@ -1060,7 +1066,7 @@ class Game {
         }
       });
       this.enemies.forEach((e, ei) => {
-        if (Math.hypot(b.x - e.x, b.y - e.y) < Game.ENEMY_RADIUS) {
+        if (Game.wrappedDistance(b, e, this.worldWidth, this.worldHeight) < Game.ENEMY_RADIUS) {
           this.bullets.splice(bi, 1);
           e.hp -= 1;
           this.spawnParticles(e.x, e.y, 20, '#f0f');
@@ -1100,7 +1106,7 @@ class Game {
       for (let j = i + 1; j < this.asteroids.length; j++) {
         const b = this.asteroids[j];
         if (a.spawnDelay > 0 || b.spawnDelay > 0) continue;
-        if (Math.hypot(a.x - b.x, a.y - b.y) < a.radius + b.radius) {
+        if (Game.wrappedDistance(a, b, this.worldWidth, this.worldHeight) < a.radius + b.radius) {
           const ang = Math.atan2(b.y - a.y, b.x - a.x);
           const force = 0.5;
           a.dx -= Math.cos(ang) * force * b.mass / a.mass;
@@ -1174,7 +1180,7 @@ class Game {
         }
       }
       this.asteroids.forEach((a, ai) => {
-        if (Math.hypot(a.x - pl.x, a.y - pl.y) < a.radius + pl.radius) {
+        if (Game.wrappedDistance(a, pl, this.worldWidth, this.worldHeight) < a.radius + pl.radius) {
           pl.shake = Math.max(pl.shake, Math.min(1, a.mass / pl.mass));
           this.spawnParticles(a.x, a.y, 20, a.color);
           this.asteroids.splice(ai, 1);
@@ -1183,14 +1189,14 @@ class Game {
         }
       });
       this.bullets.forEach((b, bi) => {
-        if (Math.hypot(b.x - pl.x, b.y - pl.y) < pl.radius) {
+        if (Game.wrappedDistance(b, pl, this.worldWidth, this.worldHeight) < pl.radius) {
           pl.shake = Math.max(pl.shake, Math.min(1, Game.BULLET_MASS / pl.mass));
           this.spawnParticles(b.x, b.y, 5, '#fff');
           this.bullets.splice(bi, 1);
         }
       });
       this.pickups.forEach((p, pi) => {
-        if (Math.hypot(p.x - pl.x, p.y - pl.y) < pl.radius + p.size) {
+        if (Game.wrappedDistance(p, pl, this.worldWidth, this.worldHeight) < pl.radius + p.size) {
           pl.shake = Math.max(pl.shake, Math.min(1, 1 / pl.mass));
           this.spawnParticles(p.x, p.y, 10, p.color);
           this.pickups.splice(pi, 1);
@@ -1246,7 +1252,7 @@ class Game {
         return;
       }
       this.asteroids.forEach((a, ai) => {
-        if (Math.hypot(p.x - a.x, p.y - a.y) < p.size + a.radius) {
+        if (Game.wrappedDistance(p, a, this.worldWidth, this.worldHeight) < p.size + a.radius) {
           this.spawnParticles((p.x + a.x) / 2, (p.y + a.y) / 2, 5, p.color);
           p.hp -= 1;
           a.hp -= 0.5;
@@ -1258,7 +1264,7 @@ class Game {
         }
       });
       this.bullets.forEach((b, bi) => {
-        if (Math.hypot(b.x - p.x, b.y - p.y) < p.size) {
+        if (Game.wrappedDistance(b, p, this.worldWidth, this.worldHeight) < p.size) {
           this.bullets.splice(bi, 1);
           this.spawnParticles(p.x, p.y, 50, p.color, 2);
           this.pickups.splice(pi, 1);
@@ -1307,7 +1313,7 @@ class Game {
 
     for (let ei = 0; ei < this.enemies.length; ei++) {
       const e = this.enemies[ei];
-      const distToShip = Math.hypot(e.x - this.ship.x, e.y - this.ship.y);
+      const distToShip = Game.wrappedDistance(e, this.ship, this.worldWidth, this.worldHeight);
       if (distToShip < e.detection && !this.ship.dead) {
         if (!e.alerted) { e.alerted = true; if (window.playSound) window.playSound('alarm'); }
         e.alertBlink += dt;
@@ -1585,9 +1591,20 @@ class Game {
 
   /** Main loop called by requestAnimationFrame */
   loop(timestamp) {
-    const dt = (timestamp - this.lastTime) / 1000;
+    // A fixed simulation step makes thrust, gravity and collisions identical on
+    // 60 Hz, 144 Hz and throttled displays. Cap long pauses to avoid a spiral of
+    // death after switching tabs.
+    const frameTime = Math.min((timestamp - this.lastTime) / 1000, Game.MAX_FRAME_TIME);
     this.lastTime = timestamp;
-    if (!this.paused) this.update(dt);
+    if (!this.paused) {
+      this.accumulator += frameTime;
+      while (this.accumulator >= Game.FIXED_DT) {
+        this.update(Game.FIXED_DT);
+        this.accumulator -= Game.FIXED_DT;
+      }
+    } else {
+      this.accumulator = 0;
+    }
     this.draw();
     if (window.updateJoystickIndicator) window.updateJoystickIndicator();
     if (this.running) requestAnimationFrame(t => this.loop(t));
@@ -1598,6 +1615,16 @@ class Game {
     this.onEnd = onEnd;
     this.running = true;
     requestAnimationFrame(t => { this.lastTime = t; this.loop(t); });
+  }
+
+  /** Stop animation, networking timers and listeners owned by this instance. */
+  destroy() {
+    this.running = false;
+    clearInterval(this.pingInterval);
+    window.removeEventListener('keydown', this.onKeyDown);
+    window.removeEventListener('keyup', this.onKeyUp);
+    window.removeEventListener('resize', this.onResize);
+    if (this.dataChannel) this.dataChannel.onmessage = null;
   }
 
   setDataChannel(ch) {
@@ -1683,6 +1710,26 @@ Game.segCircleIntersect = function(x1, y1, x2, y2, cx, cy, r) {
   return (t1 >= 0 && t1 <= 1) || (t2 >= 0 && t2 <= 1);
 };
 
+/** Wrap a coordinate into [0, size), including negative inputs. */
+Game.wrap = function(value, size) {
+  return ((value % size) + size) % size;
+};
+
+/** Shortest signed displacement from `from` to `to` on a toroidal axis. */
+Game.wrappedDelta = function(from, to, size) {
+  let delta = to - from;
+  if (delta > size / 2) delta -= size;
+  if (delta < -size / 2) delta += size;
+  return delta;
+};
+
+Game.wrappedDistance = function(a, b, width, height = width) {
+  return Math.hypot(
+    Game.wrappedDelta(a.x, b.x, width),
+    Game.wrappedDelta(a.y, b.y, height)
+  );
+};
+
 // Game constants
 Game.KEY_LEFT = 37;
 Game.KEY_UP = 38;
@@ -1734,5 +1781,8 @@ Game.ENEMY_DETECTION_RADIUS = 600;
 Game.ENEMY_HP = 1;
 Game.PALETTE = ['#fff', '#0ff', '#f0f', '#ff0', '#0f0', '#f00', '#00f', '#f80'];
 Game.ISO_SCALE = 0.5;
+Game.FIXED_DT = 1 / 60;
+Game.MAX_FRAME_TIME = 0.25;
 
-window.Game = Game;
+if (typeof window !== 'undefined') window.Game = Game;
+if (typeof module !== 'undefined' && module.exports) module.exports = Game;

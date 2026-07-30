@@ -2,7 +2,7 @@
 
 Gra to prosta wariacja na temat klasycznych **Asteroids** napisana w HTML5 i JavaScripcie. Sterujemy małym statkiem kosmicznym i staramy się przetrwać jak najdłużej w polu asteroid. Projekt ma charakter demonstracyjny i służy jako baza do dalszych eksperymentów.
 
-Aktualna wersja gry: **0.3.1**
+Aktualna wersja gry: **0.4.0**
 
 ## Co to jest za gra
 - Strzelanka zręcznościowa 2D z widokiem z góry.
@@ -11,10 +11,11 @@ Aktualna wersja gry: **0.3.1**
 - Celem jest uzyskanie jak najwyższego wyniku zanim skończy się czas lub utracimy wszystkie życia.
 
 ## Latest changes
-- Zaktualizowano do wersji **0.3.1**.
-- Multiplayer korzysta teraz z Google Sheets jako prostego serwera sygnalizacji
-  i wymaga jedynie krótkiego identyfikatora pokoju.
-- Wprowadzono wstępne wsparcie dla trybu multiplayer opartego na WebRTC (eksperymentalnie).
+- Zaktualizowano do wersji **0.4.0**.
+- Przywrócono klasyczny widok z góry: usunięto pochylenie CSS i pseudoizometryczną projekcję.
+- Symulacja korzysta ze stałego kroku 60 Hz, dzięki czemu sterowanie i grawitacja nie zależą od odświeżania monitora.
+- Poprawiono paralaksę gwiazd, zachowanie na szwach toroidalnej mapy i cykl życia kolejnych sesji.
+- WebRTC pozostaje eksperymentalne. Dotychczasowy publiczny endpoint Google Sheets obecnie odmawia dostępu, więc Host/Join nie jest funkcją gotową do wydania; plan migracji opisuje `docs/MULTIPLAYER.md`.
 - Dodano animowane obracanie statku przy wyrównywaniu kierunku lotu.
 - Usprawniono sterowanie na urządzeniach mobilnych: tapnięcie obraca i strzela w
   wybranym kierunku, a wirtualny joystick wskazuje aktualny ruch statku.
@@ -32,8 +33,7 @@ Aktualna wersja gry: **0.3.1**
 - Na minimapce pojawiła się strzałka prędkości statku oraz pulsujące okręgi namierzania przeciwników.
 - Dodano ekran sterowania i sekcję "About" w menu.
 - Pojawiła się nowa znajdźka `L` dająca laserowe pociski.
-- Dodano tryb izometryczny z pseudo-3D.
-- Naprawiono orientację statku w trybie izometrycznym – teraz pociski lecą zgodnie z kierunkiem lotu.
+- Renderowanie świata i sterowanie używają jednego, klasycznego układu współrzędnych top-down.
 
 ## Możliwości gry i przebieg rozgrywki
 - Sterowanie statkiem (obrót, przyspieszanie, strzał).
@@ -57,11 +57,15 @@ Aktualna wersja gry: **0.3.1**
 Wszystkie powyższe wartości można teraz modyfikować w menu **Ustawienia**. Parametry zapisane są w małym pliku JSON wraz z komentarzami objaśniającymi znaczenie poszczególnych opcji.
 
 ## Zasady fizyki
-- **Ruch statku i asteroid:** położenie aktualizowane jest według wzoru `x = x + v * dt`, gdzie `v` to aktualna prędkość, a `dt` to czas między klatkami.
+- **Ruch statku i asteroid:** logika działa w stałych krokach 1/60 s. Historyczne wartości prędkości są wyrażone na krok symulacji; renderowanie może działać z dowolną częstotliwością bez przyspieszania gry.
 - **Kolizje asteroid** wykorzystują uproszczoną zasadę zachowania pędu: po zderzeniu obiekty otrzymują przeciwnie skierowane składowe prędkości zależne od masy (`v1' = v1 - m2/m1 * Δv`).
 - **Siła odrzutu pocisków** dodawana jest do prędkości obiektów w punkcie trafienia proporcjonalnie do ich masy.
 - **Odbijanie się obiektów od krawędzi** realizowane jest przez przenoszenie pozycji na przeciwną stronę ekranu (toroidalna mapa).
 - **Zmiana rozmiaru statku** skalowana jest liniowo, a jego masa rośnie lub maleje wprost proporcjonalnie do nowego promienia.
+
+## Kierunek dalszego rozwoju
+
+Docelową wizję angażującej kampanii singlowej, uproszczonej fizyki orbitalnej, stacji, pyłu, planet, czarnych dziur i trybów multiplayer opisuje [docs/GAME_VISION.md](docs/GAME_VISION.md). Dokument rozdziela fundamenty wymagane do pierwszego grywalnego prototypu od pomysłów na późniejsze etapy.
 
 ## Future ideas
 - Lepsza oprawa graficzna i dźwiękowa.
@@ -73,7 +77,7 @@ Wszystkie powyższe wartości można teraz modyfikować w menu **Ustawienia**. P
 ## Problemy z udostępnianiem linków
 
 We wcześniejszych wersjach gra generowała bardzo długie adresy URL z zakodowaną
-konfiguracją sesji. Od wersji 0.3.1 wymieniamy jedynie krótki identyfikator
+konfiguracją sesji. Od wersji 0.4.0 wymieniamy jedynie krótki identyfikator
 pokoju, więc problem długich linków praktycznie zniknął. Jeśli mimo to chcesz
 używać pełnych linków z parametrem `session`, możesz je nadal skrócić np. przy
 pomocy [cleanuri.com](https://cleanuri.com/).

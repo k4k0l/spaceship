@@ -1,6 +1,6 @@
 
 const GAME_NAME = 'Asteroids';
-const GAME_VERSION = '0.3.1';
+const GAME_VERSION = '0.4.0';
 const SIGNALING_URL = 'https://script.google.com/macros/s/AKfycbxQPVHVEjrIjGfc-b7HfDdLcKjIdwHJPriR0marwKhDYbJIDI-XPVlk6qu_fAFdRpFC/exec';
 
 const canvas = document.getElementById('game');
@@ -706,6 +706,10 @@ function hideCredits() {
 }
 
 async function startGame() {
+  if (game) {
+    game.destroy();
+    game = null;
+  }
   setGameActive(true);
   hideCredits();
   hideScreens();
