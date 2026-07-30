@@ -63,6 +63,10 @@ Wszystkie powyższe wartości można teraz modyfikować w menu **Ustawienia**. P
 - **Odbijanie się obiektów od krawędzi** realizowane jest przez przenoszenie pozycji na przeciwną stronę ekranu (toroidalna mapa).
 - **Zmiana rozmiaru statku** skalowana jest liniowo, a jego masa rośnie lub maleje wprost proporcjonalnie do nowego promienia.
 
+## Kierunek dalszego rozwoju
+
+Docelową wizję angażującej kampanii singlowej, uproszczonej fizyki orbitalnej, stacji, pyłu, planet, czarnych dziur i trybów multiplayer opisuje [docs/GAME_VISION.md](docs/GAME_VISION.md). Dokument rozdziela fundamenty wymagane do pierwszego grywalnego prototypu od pomysłów na późniejsze etapy.
+
 ## Future ideas
 - Lepsza oprawa graficzna i dźwiękowa.
 - Rozbudowany system poziomów oraz nowych rodzajów przeciwników.
