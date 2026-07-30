@@ -1,5 +1,9 @@
-import { SIM_VERSION } from './simulation.mjs';
-const KEY='orbitalna-przesylka-ghost-v1';
-export function saveGhost(storage,mission,state,samples){const ghost={format:1,simulation:SIM_VERSION,mission:mission.id,seed:mission.seed,assist:state.ship.assist,samples};storage?.setItem(KEY,JSON.stringify(ghost));return ghost;}
-export function loadGhost(storage,mission,assist){try{const g=JSON.parse(storage?.getItem(KEY));return g?.format===1&&g.simulation===SIM_VERSION&&g.mission===mission.id&&g.seed===mission.seed&&g.assist===assist?g:null;}catch{return null;}}
-export const memoryStorage=()=>{const data=new Map();return {setItem:(k,v)=>data.set(k,v),getItem:k=>data.get(k)||null};};
+import { SIM_VERSION,calculateScore } from './simulation.mjs';
+const GHOST_KEY='orbitalna-przesylka-ghost-v2',SETTINGS_KEY='orbitalna-przesylka-settings-v2';
+export function saveGhost(storage,mission,state,samples){const ghost={format:2,simulation:SIM_VERSION,mission:mission.id,seed:mission.seed,assist:state.ship.assist,contract:state.contract,samples};storage?.setItem(GHOST_KEY,JSON.stringify(ghost));return ghost;}
+export function loadGhost(storage,mission,assist,contract='jelly'){try{const g=JSON.parse(storage?.getItem(GHOST_KEY));return g?.format===2&&g.simulation===SIM_VERSION&&g.mission===mission.id&&g.seed===mission.seed&&g.assist===assist&&g.contract===contract?g:null;}catch{return null;}}
+export function saveSettings(storage,settings){storage?.setItem(SETTINGS_KEY,JSON.stringify({version:2,...settings}));}
+export function loadSettings(storage){try{const s=JSON.parse(storage?.getItem(SETTINGS_KEY));return s?.version===2?s:{version:2,master:.7,effects:.8,ui:.8};}catch{return{version:2,master:.7,effects:.8,ui:.8};}}
+export function buildTelemetry(mission,state,startedAt=new Date().toISOString()){return{schemaVersion:1,missionId:mission.id,missionVersion:mission.version,simulation:SIM_VERSION,seed:mission.seed,contract:state.contract,assist:state.ship.assist,startedAt,durationSeconds:+state.time.toFixed(3),completed:state.completed,failure:state.hull<=0?'hull':state.cargo<=0?'cargo':state.time>=mission.timeLimit?'time':null,firstDockSeconds:state.events.find(e=>e.type==='dock')?.tick/60??null,gravityEntries:state.gravityEntries,collisions:state.events.filter(e=>e.type==='collision').length,decisions:state.decisions,score:calculateScore(state,state.contract)};}
+export function telemetryJSON(mission,state,startedAt){return JSON.stringify(buildTelemetry(mission,state,startedAt),null,2);}
+export const memoryStorage=()=>{const data=new Map();return{setItem:(k,v)=>data.set(k,v),getItem:k=>data.get(k)||null};};
